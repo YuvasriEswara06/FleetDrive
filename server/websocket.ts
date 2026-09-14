@@ -1,4 +1,4 @@
-﻿import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "node:http";
 import { storage } from "./storage";
 
@@ -301,6 +301,15 @@ export class FleetWebSocketManager {
   public broadcastToDrivers(packet: WebSocketPacket) {
     for (const client of this.clients.values()) {
       if (client.role === "driver" && client.ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(client.ws, packet);
+      }
+    }
+  }
+
+  // Helper: Broadcast to all clients (drivers & dispatchers)
+  public broadcastToAll(packet: WebSocketPacket) {
+    for (const client of this.clients.values()) {
+      if (client.ws.readyState === WebSocket.OPEN) {
         this.sendToClient(client.ws, packet);
       }
     }

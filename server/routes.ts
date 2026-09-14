@@ -3,6 +3,8 @@ import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
 import { geocodeAddress, getRoadMatrix, getRoadPolyline } from "./osm-client";
+import { optimizeRouteWithBenchmark } from "./ai-optimizer";
+import { wsManager } from "./websocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auto-seed on startup if needed
@@ -178,6 +180,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ polyline });
     } catch (error) {
       return res.status(500).json({ message: "Route polyline calculation failed" });
+    }
+  });
+
+  // ==========================================
+  // AI DYNAMIC ROUTE OPTIMIZATION ROUTES (AI Focus)
+  // ==========================================
+  app.post("/api/optimize", async (req, res) => {
+    try {
+      const { driverId = "driver1", driverLat, driverLng, urgentOrderId, urgentOrder } = req.body;
+
+      // 1. Determine driver location
+      let driverLocation = { lat: 13.0382, lng: 80.2466 }; // default Teynampet
+      if (typeof driverLat === "number" && typeof driverLng === "number") {
+        driverLocation = { lat: driverLat, lng: driverLng };
+      } else {
+        const telemetry = await storage.getDriverTelemetry(driverId);
+        if (telemetry) {
+          driverLocation = { lat: telemetry.lat, lng: telemetry.lng };
+        }
+      }
+
+      // 2. Fetch all orders
+      const orders = await storage.getOrders();
+
+      // 3. Resolve urgent order if provided
+      let targetUrgentOrder = urgentOrder;
+      if (!targetUrgentOrder && urgentOrderId) {
+        targetUrgentOrder = orders.find((o) => o.id === urgentOrderId);
+      }
+
+      // 4. Run AI 2-Opt & Benchmark Engine
+      const result = await optimizeRouteWithBenchmark(driverLocation, orders, targetUrgentOrder);
+      return res.json(result);
+    } catch (error) {
+      console.error("[AI Optimize] Optimization failed:", error);
+      return res.status(500).json({ message: "Route optimization failed", error: String(error) });
+    }
+  });
+
+  app.post("/api/optimize/apply", async (req, res) => {
+    try {
+      const { orderedOrderIds, strategy = "ai_dynamic" } = req.body;
+      if (!Array.isArray(orderedOrderIds) || orderedOrderIds.length === 0) {
+        return res.status(400).json({ message: "orderedOrderIds array is required" });
+      }
+
+      // Update sequence orders in storage
+      for (let i = 0; i < orderedOrderIds.length; i++) {
+        const orderId = orderedOrderIds[i];
+        await storage.updateOrder(orderId, { sequenceOrder: i + 1 });
+      }
+
+      const updatedOrders = await storage.getOrders();
+
+      // Broadcast sequence update to Driver App and Dispatcher via WebSocket
+      wsManager.broadcastToAll({
+        type: "ROUTE_RESEQUENCED",
+        data: {
+          strategy,
+          orderedOrderIds,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return res.json({
+        message: "Route resequenced and broadcast to clients successfully",
+        orders: updatedOrders,
+      });
+    } catch (error) {
+      console.error("[AI Optimize] Apply sequence failed:", error);
+      return res.status(500).json({ message: "Failed to apply sequence" });
     }
   });
 

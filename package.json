@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "postinstall": "patch-package",
-    "dev": "tsx server/index.ts",
-    "server:dev": "tsx server/index.ts",
+    "dev": "tsx watch server/index.ts",
+    "server:dev": "tsx watch server/index.ts",
     "expo:dev": "npx expo start",
     "start": "npx expo start",
     "server:build": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=server_dist",
