@@ -221,6 +221,12 @@ function setupErrorHandler(app: express.Application) {
   setupBodyParsing(app);
   setupRequestLogging(app);
 
+  // Serve Central Dispatcher Web Dashboard
+  const dispatcherPath = path.resolve(process.cwd(), "server", "dispatcher");
+  app.use("/dispatcher", express.static(dispatcherPath));
+  app.get("/admin", (_req, res) => res.redirect("/dispatcher"));
+  app.get("/dashboard", (_req, res) => res.redirect("/dispatcher"));
+
   configureExpoAndLanding(app);
 
   const server = await registerRoutes(app);

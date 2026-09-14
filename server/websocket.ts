@@ -135,8 +135,8 @@ export class FleetWebSocketManager {
       // EVENT: REGISTER (Client declares role: driver/dispatcher)
       // ----------------------------------------------------
       case "REGISTER": {
-        client.role = packet.data?.role || "dispatcher";
-        client.driverId = packet.data?.driverId || (client.role === "driver" ? "driver1" : undefined);
+        client.role = packet.data?.role || (packet as any).role || "dispatcher";
+        client.driverId = packet.data?.driverId || (packet as any).driverId || (client.role === "driver" ? "driver1" : undefined);
 
         this.sendToClient(client.ws, {
           type: "REGISTER_ACK",
@@ -180,7 +180,7 @@ export class FleetWebSocketManager {
 
         // Broadcast location live to all connected dispatchers
         this.broadcastToDispatchers({
-          type: "DRIVER_LOCATION_UPDATE",
+          type: "LOCATION_PING",
           data: {
             driverId,
             lat,

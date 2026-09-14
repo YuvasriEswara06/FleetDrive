@@ -31,7 +31,7 @@ const SHEET_MAX = SCREEN_HEIGHT * 0.55;
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { orders, fuelStopVisible, urgentMarkerVisible, urgentOrder, breakRequested, setBreakRequested } = useApp();
+  const { orders, fuelStopVisible, urgentMarkerVisible, urgentOrder, breakRequested, setBreakRequested, driverLocation } = useApp();
   const { user, logout } = useAuth();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -80,8 +80,8 @@ export default function MapScreen() {
     const markers: any[] = [];
 
     markers.push({
-      lat: 13.0475,
-      lng: 80.2090,
+      lat: driverLocation.lat,
+      lng: driverLocation.lng,
       label: "You (Driver)",
       color: Colors.primary,
       type: "driver",

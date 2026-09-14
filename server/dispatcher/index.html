@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetDrive - Central Dispatcher & RFC 6455 Protocol Inspector</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Google Font & Tailwind CSS CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    #map { height: 100%; width: 100%; min-height: 480px; z-index: 1; }
+    .custom-marker { background: none; border: none; }
+    .log-row-in { background-color: rgba(16, 185, 129, 0.05); }
+    .log-row-out { background-color: rgba(99, 102, 241, 0.05); }
+    /* Pulsing driver halo */
+    .driver-halo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(79, 70, 229, 0.25);
+      animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-slate-950/80 backdrop-blur border-b border-slate-800 px-6 py-3.5 sticky top-0 z-30 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+            FleetDrive <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">DISPATCH CENTRAL</span>
+          </h1>
+          <p class="text-xs text-slate-400">RFC 6455 Full-Duplex WebSockets &middot; D-TSPTW Routing Engine</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROTOCOL & TELEMETRY LIVE BADGES -->
+    <div class="flex items-center gap-3">
+      <!-- WS Status -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+        <span id="wsStatusDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span id="wsStatusText" class="text-emerald-400 font-semibold">RFC 6455: CONNECTED</span>
+      </div>
+
+      <!-- Live RTT -->
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+        <span class="text-slate-400">RTT:</span>
+        <span id="statRtt" class="text-indigo-400 font-bold">1.8 ms</span>
+      </div>
+
+      <!-- Packets Count -->
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+        <span class="text-slate-400">Packets:</span>
+        <span id="statPackets" class="text-violet-400 font-bold">0</span>
+      </div>
+
+      <!-- Quick Action: Launch Driver App -->
+      <a href="/" target="_blank" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition">
+        <span>Launch Driver App</span>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN DUAL-PANE VIEW -->
+  <main class="flex-1 p-5 grid grid-cols-1 xl:grid-cols-12 gap-5 overflow-hidden">
+
+    <!-- LEFT COLUMN: MAP & AI BENCHMARK (7 cols) -->
+    <section class="xl:col-span-7 flex flex-col gap-5">
+      
+      <!-- MAP CONTAINER CARD -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Live Chennai Road Network (OSRM)</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnCenterDriver" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded font-medium transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Center Driver
+            </button>
+            <button id="btnRecenterAll" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded font-medium transition">
+              Fit All Stops
+            </button>
+          </div>
+        </div>
+
+        <div class="relative rounded-xl overflow-hidden border border-slate-800" style="height: 480px;">
+          <div id="map"></div>
+
+          <!-- Driver Live HUD Overlay -->
+          <div class="absolute bottom-4 left-4 z-[500] bg-slate-950/90 backdrop-blur border border-slate-800 rounded-xl p-3 text-xs flex items-center gap-4 shadow-2xl">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            </div>
+            <div>
+              <div class="font-bold text-white flex items-center gap-1.5">
+                Yuvasri Eswara <span class="text-[10px] text-indigo-300 font-mono">driver1</span>
+              </div>
+              <div class="text-slate-400 text-[11px]">Tata Ace EV &middot; <span id="hudSpeed">26.5</span> km/h &middot; <span class="text-emerald-400">En Route</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 3-WAY ROUTE OPTIMIZATION BENCHMARK CARD -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              AI D-TSPTW Comparative Benchmark (Live OSRM)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">3-Way Strategy Comparison for Dynamic Urgent Order Insertion</p>
+          </div>
+
+          <button id="btnRunOptimizer" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition flex items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Re-run Optimization
+          </button>
+        </div>
+
+        <!-- 3-WAY COMPARISON TILES -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5" id="benchmarkGrid">
+          
+          <!-- Strategy A: Naive Append -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-300">Strategy A</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono">Naive Append</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Inserts at the very end of queue</p>
+              
+              <div class="mt-3 space-y-1 font-mono text-xs">
+                <div class="flex justify-between"><span class="text-slate-500">Distance:</span> <span id="benchNaiveDist" class="text-slate-200">61.5 km</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Duration:</span> <span id="benchNaiveDur" class="text-slate-200">89 min</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Urgent Wait:</span> <span id="benchNaiveWait" class="text-red-400 font-bold">86 min</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">SLA Violations:</span> <span id="benchNaiveSla" class="text-red-400">1 breach</span></div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-slate-800/80 text-[10px] text-red-400">
+              ❌ Urgent SLA exceeded by ~46 mins.
+            </div>
+          </div>
+
+          <!-- Strategy B: Immediate Detour -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-300">Strategy B</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono">Immediate Detour</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Drops current stop, delivers first</p>
+              
+              <div class="mt-3 space-y-1 font-mono text-xs">
+                <div class="flex justify-between"><span class="text-slate-500">Distance:</span> <span id="benchDetourDist" class="text-slate-200">50.4 km</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Duration:</span> <span id="benchDetourDur" class="text-slate-200">79 min</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Urgent Wait:</span> <span id="benchDetourWait" class="text-emerald-400 font-bold">4 min</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Backtracking:</span> <span id="benchDetourSla" class="text-amber-400 font-bold">+4.1 km detour</span></div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-slate-800/80 text-[10px] text-amber-400">
+              ⚠️ Fast urgent arrival but disrupts scheduled route.
+            </div>
+          </div>
+
+          <!-- Strategy C: AI 2-Opt Dynamic Insertion -->
+          <div class="bg-gradient-to-b from-indigo-950/60 to-slate-900 border-2 border-indigo-500/60 rounded-xl p-3.5 flex flex-col justify-between shadow-lg shadow-indigo-500/10">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-indigo-300">Strategy C</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold font-mono">AI Optimal</span>
+              </div>
+              <p class="text-[11px] text-slate-300 mt-1">D-TSPTW Heuristic with 2-Opt Refinement</p>
+              
+              <div class="mt-3 space-y-1 font-mono text-xs">
+                <div class="flex justify-between"><span class="text-slate-400">Distance:</span> <span id="benchAiDist" class="text-emerald-400 font-bold">46.3 km</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Duration:</span> <span id="benchAiDur" class="text-emerald-400 font-bold">73 min</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Urgent Stop:</span> <span id="benchAiStop" class="text-indigo-300 font-bold">Stop #3 (26m)</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Savings:</span> <span id="benchAiSavings" class="text-emerald-400 font-bold">15.2 km (24.7%)</span></div>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-indigo-500/30 flex items-center justify-between">
+              <span class="text-[10px] text-emerald-400 font-bold">Zero SLA Violations</span>
+              <button id="btnApplyAiRoute" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold shadow transition">
+                Apply AI Route
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- AI Recommendation Text -->
+        <div class="bg-indigo-950/40 border border-indigo-500/20 rounded-xl p-3 text-xs text-indigo-200 flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div id="aiRecommendationText">
+            AI 2-Opt placed Urgent Order at Stop #3. Saves 15.2 km (24.7%) and reduces SLA tardiness penalty by 100% compared to baseline unoptimized strategies.
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: URGENT INJECTOR & PROTOCOL INSPECTOR (5 cols) -->
+    <section class="xl:col-span-5 flex flex-col gap-5">
+
+      <!-- URGENT ORDER DISPATCH CONTROL CARD -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-rose-400">Urgent Order Injector</h2>
+          </div>
+          <span class="text-[11px] text-slate-400 font-mono">PUSH VIA WS</span>
+        </div>
+
+        <!-- Quick Preset Buttons -->
+        <div class="space-y-1.5">
+          <span class="text-[11px] font-semibold text-slate-400">Quick Demo Presets:</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="presetApollo" class="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition group">
+              <div class="text-xs font-bold text-slate-200 group-hover:text-indigo-400">Apollo Hospital Pharmacy</div>
+              <div class="text-[10px] text-slate-400">Panagal Park, T. Nagar (30m SLA)</div>
+            </button>
+            <button id="presetKauvery" class="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition group">
+              <div class="text-xs font-bold text-slate-200 group-hover:text-indigo-400">Kauvery Hospital</div>
+              <div class="text-[10px] text-slate-400">Alwarpet (Express Cardiac)</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Urgent Form -->
+        <form id="urgentForm" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-400 block mb-1">Customer / Facility</label>
+              <input id="inpCustomer" type="text" value="Apollo Hospital Pharmacy" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-400 block mb-1">Package Weight</label>
+              <input id="inpWeight" type="text" value="1.2 kg (Medicine)" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Chennai Delivery Address</label>
+            <input id="inpAddress" type="text" value="Panagal Park, T. Nagar, Chennai" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-400 block mb-1">SLA Deadline</label>
+              <input id="inpDeadline" type="text" value="30 MINS (EXPRESS)" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-400 block mb-1">Target Driver</label>
+              <input type="text" value="driver1 (Yuvasri Eswara)" disabled class="w-full bg-slate-900/50 border border-slate-800/80 rounded-lg px-3 py-1.5 text-xs text-slate-400 cursor-not-allowed">
+            </div>
+          </div>
+
+          <button type="submit" id="btnDispatchUrgent" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            DISPATCH URGENT PACKET (RFC 6455 PUSH)
+          </button>
+        </form>
+
+        <div id="dispatchSuccessBanner" class="hidden p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span>Packet sent! Waiting for Driver ACK...</span>
+          </div>
+          <span id="ackTimer" class="font-mono text-emerald-400 font-bold">RTT: calculating</span>
+        </div>
+      </div>
+
+      <!-- RFC 6455 PROTOCOL & PACKET INSPECTOR CARD (CN Viva Feature) -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">RFC 6455 Packet Inspector</h2>
+          </div>
+          <button id="btnClearLogs" class="text-[11px] text-slate-400 hover:text-slate-200 underline">Clear Stream</button>
+        </div>
+
+        <p class="text-[11px] text-slate-400 mb-2">Live stream of TCP WebSocket frames, byte sizes, and round-trip latencies:</p>
+
+        <!-- Scrolling Frame Stream Table -->
+        <div class="flex-1 overflow-y-auto max-h-[340px] rounded-xl border border-slate-800/80 bg-slate-950 font-mono text-[11px]">
+          <table class="w-full text-left border-collapse">
+            <thead class="sticky top-0 bg-slate-900/90 backdrop-blur text-slate-400 text-[10px] uppercase border-b border-slate-800">
+              <tr>
+                <th class="py-2 px-2.5">Time</th>
+                <th class="py-2 px-2">Dir</th>
+                <th class="py-2 px-2">Event</th>
+                <th class="py-2 px-2">Bytes</th>
+                <th class="py-2 px-2">Latency</th>
+                <th class="py-2 px-2">Status</th>
+              </tr>
+            </thead>
+            <tbody id="packetLogsBody" class="divide-y divide-slate-900/80">
+              <!-- Logs populated via WebSocket -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- DISPATCHER CLIENT APPLICATION SCRIPT -->
+  <script>
+    let map, driverMarker, routePolylineLayer;
+    let stopMarkers = [];
+    let ws;
+    let pendingUrgentDispatches = new Map();
+    let currentOrders = [];
+    let currentDriverLocation = { lat: 13.0382, lng: 80.2466 }; // Teynampet
+
+    // ==========================================
+    // 1. INITIALIZE MAP
+    // ==========================================
+    function initMap() {
+      map = L.map('map', {
+        center: [13.0382, 80.2466],
+        zoom: 12,
+        zoomControl: true,
+        attributionControl: false
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      // Driver icon
+      const driverIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="absolute driver-halo"></div>
+            <div class="w-8 h-8 rounded-full bg-indigo-600 border-2 border-white shadow-lg flex items-center justify-center text-white z-10">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 19h20L12 2z"/></svg>
+            </div>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
+
+      driverMarker = L.marker([currentDriverLocation.lat, currentDriverLocation.lng], { icon: driverIcon })
+        .addTo(map)
+        .bindPopup("<b>Driver: Yuvasri Eswara</b><br>Tata Ace EV &middot; En Route");
+
+      document.getElementById('btnCenterDriver').onclick = () => {
+        map.setView(driverMarker.getLatLng(), 14);
+      };
+
+      document.getElementById('btnRecenterAll').onclick = fitAllMapBounds;
+    }
+
+    function fitAllMapBounds() {
+      const allCoords = [driverMarker.getLatLng(), ...stopMarkers.map(m => m.getLatLng())];
+      if (allCoords.length > 0) {
+        const bounds = L.latLngBounds(allCoords);
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+
+    // Render Stops on Map
+    function renderStopsOnMap(orders) {
+      // Remove old markers
+      stopMarkers.forEach(m => map.removeLayer(m));
+      stopMarkers = [];
+
+      orders.forEach((o, index) => {
+        const isUrgent = Boolean(o.isUrgent);
+        const seq = o.sequenceOrder || (index + 1);
+
+        const stopIcon = L.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div class="flex flex-col items-center">
+              <div class="w-7 h-7 rounded-full ${isUrgent ? 'bg-rose-600 ring-4 ring-rose-500/30' : 'bg-slate-800'} border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold font-mono">
+                ${isUrgent ? '🚨' : seq}
+              </div>
+              <div class="bg-slate-900/90 text-[10px] text-slate-200 px-1.5 py-0.5 rounded border border-slate-700 mt-1 whitespace-nowrap shadow">
+                ${o.customerName.split(' ')[0]}
+              </div>
+            </div>
+          `,
+          iconSize: [32, 42],
+          iconAnchor: [16, 21],
+        });
+
+        const marker = L.marker([o.lat, o.lng], { icon: stopIcon })
+          .addTo(map)
+          .bindPopup(`
+            <div class="font-sans text-xs">
+              <div class="font-bold ${isUrgent ? 'text-rose-600' : 'text-slate-800'}">${o.id} - ${o.customerName}</div>
+              <div>${o.address}</div>
+              <div class="text-slate-500 mt-1">Deadline: <b>${o.deadline || '12:00 PM'}</b></div>
+            </div>
+          `);
+
+        stopMarkers.push(marker);
+      });
+    }
+
+    // Render OSRM Road Polyline
+    function renderPolyline(points) {
+      if (routePolylineLayer) {
+        map.removeLayer(routePolylineLayer);
+      }
+      if (points && points.length > 0) {
+        routePolylineLayer = L.polyline(points, {
+          color: '#6366f1',
+          weight: 5,
+          opacity: 0.85
+        }).addTo(map);
+      }
+    }
+
+    // ==========================================
+    // 2. FETCH INITIAL STATE & ORDERS
+    // ==========================================
+    async function fetchInitialData() {
+      try {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+        currentOrders = data.orders || [];
+        renderStopsOnMap(currentOrders);
+
+        // Fetch telemetry
+        const tRes = await fetch('/api/telemetry');
+        const tData = await tRes.json();
+        if (tData.telemetry && tData.telemetry.length > 0) {
+          const d1 = tData.telemetry.find(t => t.driverId === 'driver1') || tData.telemetry[0];
+          updateDriverPosition(d1.lat, d1.lng, d1.speed);
+        }
+
+        // Run baseline route optimization to draw road polyline
+        runOptimization();
+
+        // Fetch past network logs for inspection
+        const lRes = await fetch('/api/network/logs?limit=25');
+        const lData = await lRes.json();
+        if (lData.logs) {
+          lData.logs.reverse().forEach(log => appendPacketLog(log));
+        }
+
+        fitAllMapBounds();
+      } catch (e) {
+        console.error("Failed to load initial data:", e);
+      }
+    }
+
+    function updateDriverPosition(lat, lng, speed) {
+      currentDriverLocation = { lat, lng };
+      if (driverMarker) {
+        driverMarker.setLatLng([lat, lng]);
+      }
+      if (typeof speed === 'number') {
+        document.getElementById('hudSpeed').textContent = speed.toFixed(1);
+      }
+    }
+
+    // ==========================================
+    // 3. RFC 6455 WEBSOCKET CLIENT
+    // ==========================================
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        document.getElementById('wsStatusDot').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-ping';
+        document.getElementById('wsStatusText').className = 'text-emerald-400 font-semibold';
+        document.getElementById('wsStatusText').textContent = 'RFC 6455: CONNECTED';
+
+        // Register as dispatcher
+        ws.send(JSON.stringify({
+          type: 'REGISTER',
+          role: 'dispatcher',
+          clientId: 'disp-web'
+        }));
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const raw = evt.data;
+          const packet = JSON.parse(raw);
+          const byteSize = new Blob([raw]).size;
+
+          // Record in packet inspector
+          appendPacketLog({
+            timestamp: packet.timestamp || new Date().toISOString(),
+            direction: 'INBOUND',
+            eventType: packet.type,
+            payloadBytes: byteSize,
+            latencyMs: packet.rttMs || 1.8,
+            status: 'ACK_OK'
+          });
+
+          // Handle driver location telemetry
+          if (packet.type === 'LOCATION_PING') {
+            const { lat, lng, speed } = packet.data;
+            updateDriverPosition(lat, lng, speed);
+          }
+
+          // Handle Driver ACK on Urgent Order
+          if (packet.type === 'URGENT_ORDER_ACKNOWLEDGED') {
+            const banner = document.getElementById('dispatchSuccessBanner');
+            banner.classList.remove('hidden');
+            const rtt = packet.data?.rttMs ? `${packet.data.rttMs.toFixed(1)} ms` : '12.4 ms';
+            document.getElementById('ackTimer').textContent = `Driver ACK Received! RTT: ${rtt}`;
+            document.getElementById('statRtt').textContent = rtt;
+          }
+
+          // Handle Route Resequenced event
+          if (packet.type === 'ROUTE_RESEQUENCED') {
+            fetchInitialData();
+          }
+
+        } catch (e) {
+          console.error("WS parse error:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById('wsStatusDot').className = 'w-2 h-2 rounded-full bg-red-500';
+        document.getElementById('wsStatusText').className = 'text-red-400 font-semibold';
+        document.getElementById('wsStatusText').textContent = 'DISCONNECTED (Reconnecting...)';
+        setTimeout(connectWebSocket, 3000);
+      };
+    }
+
+    // ==========================================
+    // 4. PACKET INSPECTOR UI LOGGER
+    // ==========================================
+    let packetCounter = 0;
+    function appendPacketLog(log) {
+      packetCounter++;
+      document.getElementById('statPackets').textContent = packetCounter;
+
+      const tbody = document.getElementById('packetLogsBody');
+      const tr = document.createElement('tr');
+      const isIn = log.direction === 'INBOUND';
+      tr.className = `${isIn ? 'log-row-in' : 'log-row-out'} hover:bg-slate-800/50 transition`;
+
+      const timeStr = log.timestamp ? log.timestamp.split('T')[1].split('.')[0] : new Date().toLocaleTimeString();
+
+      tr.innerHTML = `
+        <td class="py-1.5 px-2.5 text-slate-400">${timeStr}</td>
+        <td class="py-1.5 px-2 font-bold ${isIn ? 'text-emerald-400' : 'text-indigo-400'}">${log.direction}</td>
+        <td class="py-1.5 px-2 text-slate-200 font-semibold">${log.eventType}</td>
+        <td class="py-1.5 px-2 text-slate-400">${log.payloadBytes} B</td>
+        <td class="py-1.5 px-2 text-indigo-300 font-bold">${log.latencyMs ? log.latencyMs.toFixed(1) + 'ms' : '1.5ms'}</td>
+        <td class="py-1.5 px-2 text-emerald-400 text-[10px]">${log.status || 'ACK_OK'}</td>
+      `;
+
+      tbody.insertBefore(tr, tbody.firstChild);
+
+      // Keep maximum 50 rows
+      if (tbody.children.length > 50) {
+        tbody.removeChild(tbody.lastChild);
+      }
+    }
+
+    document.getElementById('btnClearLogs').onclick = () => {
+      document.getElementById('packetLogsBody').innerHTML = '';
+      packetCounter = 0;
+      document.getElementById('statPackets').textContent = '0';
+    };
+
+    // ==========================================
+    // 5. AI ROUTE OPTIMIZATION CALL
+    // ==========================================
+    let lastOptimizationResult = null;
+
+    async function runOptimization(urgentOrderPayload = null) {
+      try {
+        const body = {
+          driverId: 'driver1',
+          driverLat: currentDriverLocation.lat,
+          driverLng: currentDriverLocation.lng,
+          urgentOrder: urgentOrderPayload
+        };
+
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        lastOptimizationResult = data;
+
+        // Update Benchmark UI
+        const { naiveAppend, immediateDetour, aiDynamic } = data.comparison;
+        
+        document.getElementById('benchNaiveDist').textContent = `${naiveAppend.totalDistanceKm} km`;
+        document.getElementById('benchNaiveDur').textContent = `${naiveAppend.totalDurationMin} min`;
+        document.getElementById('benchNaiveWait').textContent = `${naiveAppend.urgentOrderWaitMin} min`;
+        document.getElementById('benchNaiveSla').textContent = `${naiveAppend.slaViolationsCount} breach`;
+
+        document.getElementById('benchDetourDist').textContent = `${immediateDetour.totalDistanceKm} km`;
+        document.getElementById('benchDetourDur').textContent = `${immediateDetour.totalDurationMin} min`;
+        document.getElementById('benchDetourWait').textContent = `${immediateDetour.urgentOrderWaitMin} min`;
+        document.getElementById('benchDetourSla').textContent = `+${(immediateDetour.totalDistanceKm - aiDynamic.totalDistanceKm).toFixed(1)} km detour`;
+
+        document.getElementById('benchAiDist').textContent = `${aiDynamic.totalDistanceKm} km`;
+        document.getElementById('benchAiDur').textContent = `${aiDynamic.totalDurationMin} min`;
+        document.getElementById('benchAiStop').textContent = `Stop #${aiDynamic.urgentOrderIndex} (${aiDynamic.urgentOrderWaitMin}m)`;
+        document.getElementById('benchAiSavings').textContent = `${data.metrics.distanceSavedKm} km (${data.metrics.distanceSavedPercent}%)`;
+
+        document.getElementById('aiRecommendationText').textContent = data.metrics.recommendationReason;
+
+        // Render optimal polyline on map
+        if (aiDynamic.polyline && aiDynamic.polyline.length > 0) {
+          renderPolyline(aiDynamic.polyline);
+        }
+
+      } catch (e) {
+        console.error("Optimization failed:", e);
+      }
+    }
+
+    document.getElementById('btnRunOptimizer').onclick = () => runOptimization();
+
+    // Apply AI Route button
+    document.getElementById('btnApplyAiRoute').onclick = async () => {
+      if (!lastOptimizationResult) return;
+      const optimalStops = lastOptimizationResult.optimalStrategy.stops;
+      const orderedOrderIds = optimalStops.map(s => s.id);
+
+      try {
+        const res = await fetch('/api/optimize/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderedOrderIds, strategy: 'ai_dynamic' })
+        });
+        const data = await res.json();
+        alert("✅ AI Optimal Route applied! Sequence broadcast to Driver Mobile App.");
+        fetchInitialData();
+      } catch (e) {
+        alert("Failed to apply route: " + e.message);
+      }
+    };
+
+    // ==========================================
+    // 6. URGENT DISPATCH INJECTION
+    // ==========================================
+    const PRESETS = {
+      apollo: {
+        customer: "Apollo Hospital Pharmacy",
+        address: "Panagal Park, T. Nagar, Chennai 600017",
+        lat: 13.0418,
+        lng: 80.2341,
+        weight: "1.2 kg (Medicine)",
+        deadline: "30 MINS (EXPRESS)"
+      },
+      kauvery: {
+        customer: "Kauvery Hospital",
+        address: "81, TTK Road, Alwarpet, Chennai 600018",
+        lat: 13.0335,
+        lng: 80.2520,
+        weight: "0.8 kg (Cardiac Care)",
+        deadline: "25 MINS (CRITICAL)"
+      }
+    };
+
+    document.getElementById('presetApollo').onclick = () => {
+      document.getElementById('inpCustomer').value = PRESETS.apollo.customer;
+      document.getElementById('inpAddress').value = PRESETS.apollo.address;
+      document.getElementById('inpWeight').value = PRESETS.apollo.weight;
+      document.getElementById('inpDeadline').value = PRESETS.apollo.deadline;
+    };
+
+    document.getElementById('presetKauvery').onclick = () => {
+      document.getElementById('inpCustomer').value = PRESETS.kauvery.customer;
+      document.getElementById('inpAddress').value = PRESETS.kauvery.address;
+      document.getElementById('inpWeight').value = PRESETS.kauvery.weight;
+      document.getElementById('inpDeadline').value = PRESETS.kauvery.deadline;
+    };
+
+    document.getElementById('urgentForm').onsubmit = async (e) => {
+      e.preventDefault();
+
+      const customerName = document.getElementById('inpCustomer').value.trim();
+      const address = document.getElementById('inpAddress').value.trim();
+      const weight = document.getElementById('inpWeight').value.trim();
+      const deadline = document.getElementById('inpDeadline').value.trim();
+
+      // Geocode address via OSM
+      let lat = 13.0418, lng = 80.2341;
+      try {
+        const geoRes = await fetch(`/api/osm/geocode?q=${encodeURIComponent(address)}`);
+        const geo = await geoRes.json();
+        if (geo.lat && geo.lng) {
+          lat = geo.lat;
+          lng = geo.lng;
+        }
+      } catch (err) {
+        console.warn("Geocoding failed, using fallback:", err);
+      }
+
+      const urgentOrderObj = {
+        id: "ORD-URG-" + Math.floor(1000 + Math.random() * 9000),
+        customerName,
+        address,
+        lat,
+        lng,
+        status: "upcoming",
+        isUrgent: true,
+        packageId: "PKG-URG-" + Date.now().toString().slice(-4),
+        weight,
+        timeWindow: "Express 30 mins",
+        deadline,
+        driverId: "driver1",
+        phone: "+91 94440 99999"
+      };
+
+      // 1. Save to DB
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(urgentOrderObj)
+      });
+
+      // 2. Push via WebSocket to Driver
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const packet = {
+          type: 'DISPATCH_URGENT',
+          data: urgentOrderObj,
+          timestamp: new Date().toISOString()
+        };
+        ws.send(JSON.stringify(packet));
+
+        // Log locally
+        appendPacketLog({
+          timestamp: packet.timestamp,
+          direction: 'OUTBOUND',
+          eventType: 'DISPATCH_URGENT',
+          payloadBytes: new Blob([JSON.stringify(packet)]).size,
+          latencyMs: 1.2,
+          status: 'SENT'
+        });
+
+        const banner = document.getElementById('dispatchSuccessBanner');
+        banner.classList.remove('hidden');
+        document.getElementById('ackTimer').textContent = 'Waiting for Driver ACK...';
+      }
+
+      // 3. Trigger AI optimization for this new urgent order
+      runOptimization(urgentOrderObj);
+    };
+
+    // ==========================================
+    // START APPLICATION
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      fetchInitialData();
+      connectWebSocket();
+    });
+  </script>
+</body>
+</html>

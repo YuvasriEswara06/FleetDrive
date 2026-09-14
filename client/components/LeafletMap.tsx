@@ -15,10 +15,11 @@ interface LeafletMapProps {
   zoom?: number;
   style?: any;
   showRoute?: boolean;
+  polyline?: Array<[number, number]>;
 }
 
 function getLeafletHTML(props: LeafletMapProps): string {
-  const { markers = [], center = { lat: 13.0827, lng: 80.2707 }, zoom = 13, showRoute = false } = props;
+  const { markers = [], center = { lat: 13.0827, lng: 80.2707 }, zoom = 13, showRoute = false, polyline = [] } = props;
 
   const markerJS = markers
     .map((m) => {
@@ -46,12 +47,19 @@ function getLeafletHTML(props: LeafletMapProps): string {
     })
     .join("\n");
 
-  const routeJS = showRoute && markers.length >= 2
+  const polylineJS = polyline.length > 0
     ? `
-      var routeCoords = [${markers.map((m) => `[${m.lat}, ${m.lng}]`).join(",")}];
-      L.polyline(routeCoords, { color: '#2563EB', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
+      var roadPolyline = ${JSON.stringify(polyline)};
+      var poly = L.polyline(roadPolyline, { color: '#2563EB', weight: 5, opacity: 0.85 }).addTo(map);
+      try { map.fitBounds(poly.getBounds(), { padding: [40, 40] }); } catch(e) {}
     `
-    : "";
+    : (showRoute && markers.length >= 2
+      ? `
+        var routeCoords = [${markers.map((m) => `[${m.lat}, ${m.lng}]`).join(",")}];
+        var poly = L.polyline(routeCoords, { color: '#2563EB', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
+        try { map.fitBounds(poly.getBounds(), { padding: [40, 40] }); } catch(e) {}
+      `
+      : "");
 
   return `<!DOCTYPE html>
 <html>
