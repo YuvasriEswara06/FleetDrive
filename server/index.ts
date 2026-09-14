@@ -225,17 +225,14 @@ function setupErrorHandler(app: express.Application) {
 
   const server = await registerRoutes(app);
 
+  // Initialize RFC 6455 WebSocket Engine on /ws
+  const { wsManager } = await import("./websocket");
+  wsManager.init(server);
+
   setupErrorHandler(app);
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`express server serving on port ${port}`);
-    },
-  );
+  server.listen(port, "0.0.0.0", () => {
+    log(`🚀 FleetDrive server & WebSockets running on port ${port}`);
+  });
 })();
