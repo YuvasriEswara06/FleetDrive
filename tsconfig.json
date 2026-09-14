@@ -5,7 +5,7 @@
     "strict": true,
     "paths": {
       "@/*": [
-        "./*"
+        "./client/*"
       ],
       "@shared/*": [
         "./shared/*"
