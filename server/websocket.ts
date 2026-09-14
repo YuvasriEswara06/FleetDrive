@@ -253,6 +253,22 @@ export class FleetWebSocketManager {
       }
 
       // ----------------------------------------------------
+      // EVENT: DRIVER_EXCEPTION_ALERT (Break / Fuel Request)
+      // ----------------------------------------------------
+      case "DRIVER_EXCEPTION_ALERT": {
+        const exceptionData = packet.data;
+        // Broadcast immediately to dispatchers
+        this.broadcastToDispatchers({
+          type: "DRIVER_EXCEPTION_ALERT",
+          data: {
+            ...exceptionData,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        break;
+      }
+
+      // ----------------------------------------------------
       // EVENT: PONG (Heartbeat response)
       // ----------------------------------------------------
       case "PONG": {

@@ -36,6 +36,8 @@ interface AppContextValue {
   wsConnected: boolean;
   driverLocation: { lat: number; lng: number };
   refreshOrders: () => Promise<void>;
+  completeOrder: (orderId: string, notes?: string) => Promise<void>;
+  sendExceptionAlert: (type: "FUEL_REQUEST" | "BREAK_REQUEST", details: any) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -266,10 +268,97 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setVoiceBotMessage("New urgent order added. Recalculating route for minimum delay.");
   }, []);
 
-  const requestFuelStop = () => {
+  const sendExceptionAlert = useCallback((type: "FUEL_REQUEST" | "BREAK_REQUEST", details: any) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "DRIVER_EXCEPTION_ALERT",
+          data: {
+            driverId: "driver1",
+            driverName: "Yuvasri Eswara",
+            type,
+            ...details,
+            timestamp: new Date().toISOString(),
+          },
+        })
+      );
+    }
+  }, []);
+
+  const requestFuelStop = useCallback(() => {
     setFuelStopVisible(true);
     setFuelRequested(true);
-  };
+    sendExceptionAlert("FUEL_REQUEST", {
+      message: "Emergency Fuel Stop Requested (Indian Oil, Adyar)",
+      location: { lat: 13.0067, lng: 80.2571 },
+    });
+    setNotifications((prev) => [
+      {
+        id: "NOTIF-FUEL-" + Date.now(),
+        title: "⛽ Fuel Stop Requested",
+        message: "Indian Oil, Adyar added to route. Central Dispatch notified.",
+        time: "Just now",
+        read: false,
+        type: "warning",
+      },
+      ...prev,
+    ]);
+  }, [sendExceptionAlert]);
+
+  const completeOrder = useCallback(async (orderId: string, notes?: string) => {
+    try {
+      // 1. Send status update to backend REST API
+      const apiUrl = getApiUrl();
+      await fetch(`${apiUrl}/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+
+      // 2. Broadcast live ORDER_STATUS_UPDATE over WebSocket
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "ORDER_STATUS_UPDATE",
+            data: {
+              orderId,
+              status: "completed",
+              driverId: "driver1",
+              completedAt: new Date().toISOString(),
+              notes: notes || "Delivered with photo proof",
+            },
+          })
+        );
+      }
+
+      // 3. Update local order state
+      setOrders((prev) => {
+        const next = prev.map((o) => (o.id === orderId ? { ...o, status: "completed" as const } : o));
+        const hasEnRoute = next.some((o) => o.status === "en_route");
+        if (!hasEnRoute) {
+          const firstUpcoming = next.find((o) => o.status === "upcoming");
+          if (firstUpcoming) {
+            return next.map((o) => (o.id === firstUpcoming.id ? { ...o, status: "en_route" as const } : o));
+          }
+        }
+        return next;
+      });
+
+      setNotifications((prev) => [
+        {
+          id: "NOTIF-COMP-" + Date.now(),
+          title: "✅ Delivery Completed",
+          message: `Order ${orderId} delivered successfully. Proof uploaded to dispatch.`,
+          time: "Just now",
+          read: false,
+          type: "info",
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error("[AppContext] Failed to complete order:", err);
+    }
+  }, []);
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -374,6 +463,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wsConnected,
       driverLocation,
       refreshOrders,
+      completeOrder,
+      sendExceptionAlert,
     }),
     [
       orders,
@@ -395,6 +486,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wsConnected,
       driverLocation,
       refreshOrders,
+      completeOrder,
+      sendExceptionAlert,
     ]
   );
 

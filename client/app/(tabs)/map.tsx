@@ -31,7 +31,7 @@ const SHEET_MAX = SCREEN_HEIGHT * 0.55;
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { orders, fuelStopVisible, urgentMarkerVisible, urgentOrder, breakRequested, setBreakRequested, driverLocation } = useApp();
+  const { orders, fuelStopVisible, urgentMarkerVisible, urgentOrder, breakRequested, setBreakRequested, driverLocation, sendExceptionAlert } = useApp();
   const { user, logout } = useAuth();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,8 +55,12 @@ export default function MapScreen() {
   const toggleBreak = useCallback((val: boolean) => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBreakRequested(val);
+    sendExceptionAlert("BREAK_REQUEST", {
+      status: val ? "REQUESTED" : "CANCELLED",
+      message: val ? "Driver requested 15-minute rest break" : "Driver cancelled rest break",
+    });
     showToast(val ? "Break requested - dispatch notified" : "Break request cancelled");
-  }, [showToast, setBreakRequested]);
+  }, [showToast, setBreakRequested, sendExceptionAlert]);
 
   const enRouteOrder = orders.find((o) => o.status === "en_route");
   const webTopInset = Platform.OS === "web" ? 67 : 0;

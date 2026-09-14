@@ -2,11 +2,13 @@
  * End-to-End Verification Test for FleetDrive
  * 
  * Verifies the complete real-time lifecycle:
- * 1. Dual WebSocket connection (Dispatcher Web & Driver Mobile)
- * 2. Real-time Telemetry Streaming (LOCATION_PING)
- * 3. Urgent Order Dispatch Push (DISPATCH_URGENT)
- * 4. Driver Acknowledgment & RTT Latency Calculation (ACK_URGENT_ACCEPTED)
- * 5. AI Route Resequencing Broadcast (ROUTE_RESEQUENCED)
+ * 1. Dispatcher Login Authentication Gate (Feature 4)
+ * 2. Dual WebSocket connection (Dispatcher Web & Driver Mobile)
+ * 3. Real-time Telemetry Streaming (LOCATION_PING)
+ * 4. Driver Exception Alert Broadcast (Feature 2: Fuel / Break)
+ * 5. Urgent Order Dispatch Push & RTT Latency Calculation (DISPATCH_URGENT & ACK)
+ * 6. Order Completion Status Sync (Feature 1: ORDER_STATUS_UPDATE -> ORDER_STATUS_CHANGED)
+ * 7. AI Route Resequencing Broadcast (ROUTE_RESEQUENCED)
  */
 
 import WebSocket from "ws";
@@ -16,18 +18,39 @@ async function runE2ETest() {
   console.log("🚀 Running Full End-to-End System Verification...");
   console.log("=================================================");
 
+  // 1. Test Dispatcher Authentication Gate (Feature 4)
+  console.log("\n🔑 1. Testing Dispatcher Login Gate (POST /api/auth/login)...");
+  let dispatcherAuthPassed = false;
+  try {
+    const authRes = await fetch("http://localhost:5000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "dispatcher", password: "admin123" }),
+    });
+    const authData = await authRes.json();
+    if (authRes.ok && authData.user?.role === "dispatcher") {
+      dispatcherAuthPassed = true;
+      console.log(`✅ Dispatcher authenticated successfully: ${authData.user.name} (${authData.user.role})`);
+    } else {
+      console.error("❌ Dispatcher auth failed:", authData);
+    }
+  } catch (e) {
+    console.error("❌ Auth endpoint connection error:", e);
+  }
+
   const WS_URL = "ws://localhost:5000/ws";
 
-  // 1. Establish Driver Socket
+  // 2. Establish Driver Socket & Dispatcher Socket
   const driverWs = new WebSocket(WS_URL);
-  // 2. Establish Dispatcher Socket
   const dispatcherWs = new WebSocket(WS_URL);
 
   let driverRegistered = false;
   let dispatcherRegistered = false;
+  let locationReceivedByDispatcher = false;
   let urgentReceivedByDriver = false;
   let ackReceivedByDispatcher = false;
-  let locationReceivedByDispatcher = false;
+  let exceptionAlertReceived = false;
+  let orderStatusChangedReceived = false;
   let routeResequencedReceived = false;
 
   await Promise.all([
@@ -64,7 +87,6 @@ async function runE2ETest() {
   // Setup Dispatcher Listener
   dispatcherWs.on("message", (raw) => {
     const packet = JSON.parse(raw.toString());
-    // console.log("[Dispatcher Inbound]", packet.type);
 
     if (packet.type === "LOCATION_PING") {
       locationReceivedByDispatcher = true;
@@ -75,12 +97,23 @@ async function runE2ETest() {
       ackReceivedByDispatcher = true;
       console.log(`✅ Dispatcher received Driver ACK for order: ${packet.data.orderId} (RTT: ${packet.data.rttMs?.toFixed(1) || "12"} ms)`);
     }
+
+    // Feature 2: Driver Exception Alert received by Dispatcher
+    if (packet.type === "DRIVER_EXCEPTION_ALERT") {
+      exceptionAlertReceived = true;
+      console.log(`⚠️ Dispatcher received DRIVER EXCEPTION ALERT: [${packet.data.type}] ${packet.data.message}`);
+    }
+
+    // Feature 1: Order Status Changed received by Dispatcher
+    if (packet.type === "ORDER_STATUS_CHANGED") {
+      orderStatusChangedReceived = true;
+      console.log(`📦 Dispatcher received ORDER_STATUS_CHANGED: Order ${packet.data.orderId} marked ${packet.data.status}`);
+    }
   });
 
   // Setup Driver Listener
   driverWs.on("message", (raw) => {
     const packet = JSON.parse(raw.toString());
-    // console.log("[Driver Inbound]", packet.type);
 
     if (packet.type === "URGENT_ORDER_DISPATCHED") {
       urgentReceivedByDriver = true;
@@ -106,8 +139,8 @@ async function runE2ETest() {
     }
   });
 
-  // Test 1: Driver sends LOCATION_PING
-  console.log("\n1️⃣ Driver sending LOCATION_PING...");
+  // Test 2: Driver sends LOCATION_PING
+  console.log("\n2️⃣ Driver sending LOCATION_PING...");
   driverWs.send(
     JSON.stringify({
       type: "LOCATION_PING",
@@ -124,8 +157,25 @@ async function runE2ETest() {
 
   await new Promise((r) => setTimeout(r, 400));
 
-  // Test 2: Dispatcher injects Urgent Order
-  console.log("\n2️⃣ Dispatcher sending DISPATCH_URGENT packet...");
+  // Test 3: Driver sends DRIVER_EXCEPTION_ALERT (Feature 2)
+  console.log("\n3️⃣ Driver sending DRIVER_EXCEPTION_ALERT (Fuel Stop Request)...");
+  driverWs.send(
+    JSON.stringify({
+      type: "DRIVER_EXCEPTION_ALERT",
+      data: {
+        driverId: "driver1",
+        driverName: "Yuvasri Eswara",
+        type: "FUEL_REQUEST",
+        message: "Emergency Fuel Stop Requested (Indian Oil, Adyar)",
+        location: { lat: 13.0067, lng: 80.2571 },
+      },
+    })
+  );
+
+  await new Promise((r) => setTimeout(r, 400));
+
+  // Test 4: Dispatcher injects Urgent Order
+  console.log("\n4️⃣ Dispatcher sending DISPATCH_URGENT packet...");
   const urgentPacket = {
     type: "DISPATCH_URGENT",
     data: {
@@ -142,8 +192,23 @@ async function runE2ETest() {
 
   await new Promise((r) => setTimeout(r, 600));
 
-  // Test 3: Apply AI Sequence via REST API
-  console.log("\n3️⃣ Dispatcher applying AI Route Sequence via POST /api/optimize/apply...");
+  // Test 5: Driver marks Order as Completed (Feature 1)
+  console.log("\n5️⃣ Driver sending ORDER_STATUS_UPDATE (Stop Completed)...");
+  driverWs.send(
+    JSON.stringify({
+      type: "ORDER_STATUS_UPDATE",
+      data: {
+        orderId: "ORD-3001",
+        status: "completed",
+        driverId: "driver1",
+      },
+    })
+  );
+
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Test 6: Apply AI Sequence via REST API
+  console.log("\n6️⃣ Dispatcher applying AI Route Sequence via POST /api/optimize/apply...");
   const applyRes = await fetch("http://localhost:5000/api/optimize/apply", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -162,27 +227,32 @@ async function runE2ETest() {
 
   // Assertions
   console.log("\n=================================================");
-  console.log("📊 Verification Checklist:");
-  console.log(`- Driver Registered:           ${driverRegistered ? "✅ PASS" : "❌ FAIL"}`);
-  console.log(`- Dispatcher Registered:       ${dispatcherRegistered ? "✅ PASS" : "❌ FAIL"}`);
-  console.log(`- GPS Telemetry Received:      ${locationReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
-  console.log(`- Urgent Order Pushed:         ${urgentReceivedByDriver ? "✅ PASS" : "❌ FAIL"}`);
-  console.log(`- Urgent Order Acknowledged:   ${ackReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
-  console.log(`- Route Resequence Broadcast:  ${routeResequencedReceived ? "✅ PASS" : "❌ FAIL"}`);
+  console.log("📊 Full Lifecycle Verification Checklist:");
+  console.log(`- Feature 4: Dispatcher Auth Login:    ${dispatcherAuthPassed ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Driver & Dispatcher Sockets:         ${driverRegistered && dispatcherRegistered ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- GPS Telemetry Stream:                ${locationReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Feature 2: Driver Exception Alert:   ${exceptionAlertReceived ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Urgent Order Pushed:                 ${urgentReceivedByDriver ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Urgent Order Acknowledged (RTT):     ${ackReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Feature 1: Order Completed Sync:     ${orderStatusChangedReceived ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Route Resequence Broadcast:          ${routeResequencedReceived ? "✅ PASS" : "❌ FAIL"}`);
   console.log("=================================================");
 
   driverWs.close();
   dispatcherWs.close();
 
   if (
+    dispatcherAuthPassed &&
     driverRegistered &&
     dispatcherRegistered &&
     locationReceivedByDispatcher &&
+    exceptionAlertReceived &&
     urgentReceivedByDriver &&
     ackReceivedByDispatcher &&
+    orderStatusChangedReceived &&
     routeResequencedReceived
   ) {
-    console.log("\n🎉 ALL FULL DUPLEX E2E TESTS PASSED WITH 100% SUCCESS!");
+    console.log("\n🎉 ALL ENHANCED E2E FEATURES PASSED WITH 100% SUCCESS!");
   } else {
     throw new Error("One or more E2E checks failed.");
   }

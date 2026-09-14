@@ -17,8 +17,12 @@ import * as ImagePicker from "expo-image-picker";
 import Colors from "@/constants/colors";
 import { EXCEPTION_TYPES } from "@/lib/mock-data";
 import VoiceBotFAB from "@/components/VoiceBotFAB";
+import { useApp } from "@/lib/app-context";
 
 export default function DeliveryProofScreen() {
+  const { orders, completeOrder } = useApp();
+  const enRouteOrder = orders.find((o) => o.status === "en_route") || orders[0];
+
   const [proofImage, setProofImage] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"proof" | "exception" | null>(null);
   const [exceptionCategory, setExceptionCategory] = useState("");
@@ -53,6 +57,12 @@ export default function DeliveryProofScreen() {
       return;
     }
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Call live completeOrder API & WebSocket
+    if (selectedAction === "proof" && enRouteOrder) {
+      completeOrder(enRouteOrder.id, notes);
+    }
+
     setShowPopup(true);
     Animated.parallel([
       Animated.spring(popupScale, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }),

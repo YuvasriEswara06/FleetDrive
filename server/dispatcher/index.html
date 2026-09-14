@@ -60,6 +60,35 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
 
+  <!-- DISPATCHER AUTHENTICATION GATE MODAL (Feature 4) -->
+  <div id="dispatcherAuthModal" class="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-7 max-w-md w-full shadow-2xl relative">
+      <div class="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto mb-4">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <h2 class="text-lg font-bold text-center text-white mb-1">Fleet Central Dispatch</h2>
+      <p class="text-xs text-center text-slate-400 mb-6">Enter dispatcher credentials to access Control Tower</p>
+
+      <form id="dispatcherLoginForm" class="space-y-4">
+        <div>
+          <label class="text-[11px] font-semibold text-slate-300 block mb-1">Dispatcher Username</label>
+          <input id="dispAuthUsername" type="text" value="dispatcher" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono">
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-300 block mb-1">Password</label>
+          <input id="dispAuthPassword" type="password" value="admin123" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono">
+        </div>
+        <div id="dispAuthError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-center"></div>
+        <button type="submit" id="btnDispLogin" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition">
+          AUTHENTICATE & ENTER CONTROL TOWER
+        </button>
+      </form>
+      <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-center text-slate-500 font-mono">
+        Seeded Login: <span class="text-indigo-400 font-semibold">dispatcher</span> &middot; Password: <span class="text-indigo-400 font-semibold">admin123</span>
+      </div>
+    </div>
+  </div>
+
   <!-- TOP APP BAR -->
   <header class="bg-slate-950/80 backdrop-blur border-b border-slate-800 px-6 py-3.5 sticky top-0 z-30 flex items-center justify-between">
     <div class="flex items-center gap-4">
@@ -105,6 +134,12 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
         </svg>
       </a>
+
+      <!-- Sign Out Button (Feature 4) -->
+      <button id="btnSignOut" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold transition" title="Sign Out of Dispatcher">
+        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        <span>Sign Out</span>
+      </button>
     </div>
   </header>
 
@@ -112,8 +147,34 @@
   <main class="flex-1 p-5 grid grid-cols-1 xl:grid-cols-12 gap-5 overflow-hidden">
 
     <!-- LEFT COLUMN: MAP & AI BENCHMARK (7 cols) -->
-    <section class="xl:col-span-7 flex flex-col gap-5">
+    <section class="xl:col-span-7 flex flex-col gap-4">
       
+      <!-- DRIVER EXCEPTION ALERT BANNER (Feature 2) -->
+      <div id="driverExceptionBanner" class="hidden p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between shadow-lg animate-pulse">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl" id="exceptionIcon">⚠️</span>
+          <div>
+            <div class="font-bold text-amber-300 flex items-center gap-2" id="exceptionTitle">DRIVER EXCEPTION ALERT</div>
+            <div class="text-[11px] text-slate-300 mt-0.5" id="exceptionMsg">Driver Yuvasri requested emergency fuel stop</div>
+          </div>
+        </div>
+        <button id="btnDismissException" class="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 rounded-lg text-xs font-semibold transition">
+          Acknowledge & Clear
+        </button>
+      </div>
+
+      <!-- DELIVERY COMPLETED TOAST (Feature 1) -->
+      <div id="deliveryCompletedToast" class="hidden p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-2.5">
+          <span class="text-base">✅</span>
+          <div>
+            <div class="font-bold text-emerald-300" id="deliveryToastTitle">Delivery Completed</div>
+            <div class="text-[11px] text-slate-300" id="deliveryToastMsg">Order completed by driver</div>
+          </div>
+        </div>
+        <button id="btnDismissDeliveryToast" class="px-2 py-0.5 text-emerald-400 hover:text-emerald-300 text-xs font-semibold">✕</button>
+      </div>
+
       <!-- MAP CONTAINER CARD -->
       <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-xl">
         <div class="flex items-center justify-between mb-3">
@@ -132,7 +193,7 @@
           </div>
         </div>
 
-        <div class="relative rounded-xl overflow-hidden border border-slate-800" style="height: 480px;">
+        <div class="relative rounded-xl overflow-hidden border border-slate-800" style="height: 460px;">
           <div id="map"></div>
 
           <!-- Driver Live HUD Overlay -->
@@ -370,6 +431,71 @@
     let currentDriverLocation = { lat: 13.0382, lng: 80.2466 }; // Teynampet
 
     // ==========================================
+    // 0. AUTHENTICATION CHECK (Feature 4)
+    // ==========================================
+    function checkAuth() {
+      const isAuth = sessionStorage.getItem('fleetdrive_disp_auth') === 'true';
+      const modal = document.getElementById('dispatcherAuthModal');
+      if (!isAuth) {
+        modal.classList.remove('hidden');
+        return false;
+      } else {
+        modal.classList.add('hidden');
+        return true;
+      }
+    }
+
+    document.getElementById('dispatcherLoginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('dispAuthUsername').value.trim();
+      const password = document.getElementById('dispAuthPassword').value.trim();
+      const errorBox = document.getElementById('dispAuthError');
+      errorBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          errorBox.textContent = data.message || 'Invalid credentials';
+          errorBox.classList.remove('hidden');
+          return;
+        }
+
+        const data = await res.json();
+        if (data.user?.role !== 'dispatcher') {
+          errorBox.textContent = 'Account must be assigned role: dispatcher';
+          errorBox.classList.remove('hidden');
+          return;
+        }
+
+        // Authentication successful
+        sessionStorage.setItem('fleetdrive_disp_auth', 'true');
+        sessionStorage.setItem('fleetdrive_disp_user', JSON.stringify(data.user));
+        document.getElementById('dispatcherAuthModal').classList.add('hidden');
+
+        // Initialize dashboard components
+        if (!map) initMap();
+        fetchInitialData();
+        if (!ws || ws.readyState !== WebSocket.OPEN) connectWebSocket();
+
+      } catch (err) {
+        errorBox.textContent = 'Connection error. Please try again.';
+        errorBox.classList.remove('hidden');
+      }
+    };
+
+    document.getElementById('btnSignOut').onclick = () => {
+      sessionStorage.removeItem('fleetdrive_disp_auth');
+      sessionStorage.removeItem('fleetdrive_disp_user');
+      document.getElementById('dispatcherAuthModal').classList.remove('hidden');
+    };
+
+    // ==========================================
     // 1. INITIALIZE MAP
     // ==========================================
     function initMap() {
@@ -418,7 +544,7 @@
       }
     }
 
-    // Render Stops on Map
+    // Render Stops on Map with completed status support (Feature 1)
     function renderStopsOnMap(orders) {
       // Remove old markers
       stopMarkers.forEach(m => map.removeLayer(m));
@@ -426,17 +552,26 @@
 
       orders.forEach((o, index) => {
         const isUrgent = Boolean(o.isUrgent);
+        const isCompleted = o.status === "completed";
         const seq = o.sequenceOrder || (index + 1);
+
+        const badgeColor = isCompleted
+          ? 'bg-emerald-600 ring-2 ring-emerald-400'
+          : isUrgent
+          ? 'bg-rose-600 ring-4 ring-rose-500/30'
+          : 'bg-slate-800';
+
+        const badgeText = isCompleted ? '✓' : isUrgent ? '🚨' : seq;
 
         const stopIcon = L.divIcon({
           className: 'custom-marker',
           html: `
             <div class="flex flex-col items-center">
-              <div class="w-7 h-7 rounded-full ${isUrgent ? 'bg-rose-600 ring-4 ring-rose-500/30' : 'bg-slate-800'} border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold font-mono">
-                ${isUrgent ? '🚨' : seq}
+              <div class="w-7 h-7 rounded-full ${badgeColor} border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold font-mono">
+                ${badgeText}
               </div>
-              <div class="bg-slate-900/90 text-[10px] text-slate-200 px-1.5 py-0.5 rounded border border-slate-700 mt-1 whitespace-nowrap shadow">
-                ${o.customerName.split(' ')[0]}
+              <div class="bg-slate-900/90 text-[10px] ${isCompleted ? 'text-emerald-300' : 'text-slate-200'} px-1.5 py-0.5 rounded border border-slate-700 mt-1 whitespace-nowrap shadow">
+                ${o.customerName.split(' ')[0]} ${isCompleted ? '(Done)' : ''}
               </div>
             </div>
           `,
@@ -448,9 +583,10 @@
           .addTo(map)
           .bindPopup(`
             <div class="font-sans text-xs">
-              <div class="font-bold ${isUrgent ? 'text-rose-600' : 'text-slate-800'}">${o.id} - ${o.customerName}</div>
+              <div class="font-bold ${isCompleted ? 'text-emerald-400' : isUrgent ? 'text-rose-600' : 'text-slate-200'}">${o.id} - ${o.customerName}</div>
               <div>${o.address}</div>
-              <div class="text-slate-500 mt-1">Deadline: <b>${o.deadline || '12:00 PM'}</b></div>
+              <div class="text-slate-400 mt-1">Status: <b class="uppercase ${isCompleted ? 'text-emerald-400' : 'text-indigo-400'}">${o.status}</b></div>
+              <div class="text-slate-500">Deadline: <b>${o.deadline || '12:00 PM'}</b></div>
             </div>
           `);
 
@@ -574,6 +710,19 @@
             fetchInitialData();
           }
 
+          // Feature 1: Handle live Order Status Update (Driver completed delivery)
+          if (packet.type === 'ORDER_STATUS_CHANGED' || packet.type === 'ORDER_STATUS_UPDATE') {
+            const { orderId, status } = packet.data;
+            showDeliveryToast(`Stop Completed: Order ${orderId} marked Delivered by driver!`);
+            fetchInitialData();
+          }
+
+          // Feature 2: Handle Driver Exception Alert (Fuel & Break requests)
+          if (packet.type === 'DRIVER_EXCEPTION_ALERT') {
+            const { type, message } = packet.data;
+            showDriverExceptionAlert(type, message);
+          }
+
         } catch (e) {
           console.error("WS parse error:", e);
         }
@@ -586,6 +735,46 @@
         setTimeout(connectWebSocket, 3000);
       };
     }
+
+    // Exception Alert Banner Controls (Feature 2)
+    function showDriverExceptionAlert(type, message) {
+      const banner = document.getElementById('driverExceptionBanner');
+      const icon = document.getElementById('exceptionIcon');
+      const title = document.getElementById('exceptionTitle');
+      const msg = document.getElementById('exceptionMsg');
+
+      if (type === 'FUEL_REQUEST') {
+        icon.textContent = '⛽';
+        title.textContent = 'DRIVER FUEL STOP REQUEST';
+      } else if (type === 'BREAK_REQUEST') {
+        icon.textContent = '☕';
+        title.textContent = 'DRIVER BREAK REQUEST';
+      } else {
+        icon.textContent = '⚠️';
+        title.textContent = 'DRIVER EXCEPTION ALERT';
+      }
+
+      msg.textContent = message || 'Driver reported an exception.';
+      banner.classList.remove('hidden');
+    }
+
+    document.getElementById('btnDismissException').onclick = () => {
+      document.getElementById('driverExceptionBanner').classList.add('hidden');
+    };
+
+    // Delivery Completed Toast Controls (Feature 1)
+    function showDeliveryToast(message) {
+      const toast = document.getElementById('deliveryCompletedToast');
+      document.getElementById('deliveryToastMsg').textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 6000);
+    }
+
+    document.getElementById('btnDismissDeliveryToast').onclick = () => {
+      document.getElementById('deliveryCompletedToast').classList.add('hidden');
+    };
 
     // ==========================================
     // 4. PACKET INSPECTOR UI LOGGER
@@ -812,9 +1001,12 @@
     // START APPLICATION
     // ==========================================
     window.addEventListener('DOMContentLoaded', () => {
-      initMap();
-      fetchInitialData();
-      connectWebSocket();
+      const isAuthed = checkAuth();
+      if (isAuthed) {
+        initMap();
+        fetchInitialData();
+        connectWebSocket();
+      }
     });
   </script>
 </body>
