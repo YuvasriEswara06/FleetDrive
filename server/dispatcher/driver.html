@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetDrive — Driver Mobile Viewport (Edge Client)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 20%, #0f172a 0%, #020617 100%);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      color: #f8fafc;
+    }
+    /* Smartphone Bezel Styling */
+    .phone-frame {
+      width: 395px;
+      height: 812px;
+      border: 12px solid #1e293b;
+      border-radius: 54px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.15);
+      position: relative;
+      background: #090d16;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .dynamic-island {
+      width: 110px;
+      height: 26px;
+      background: #000;
+      border-radius: 20px;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .camera-lens {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+    }
+    /* Glass card styles */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Pulsing alert animation */
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 15px rgba(239, 68, 68, 0.2); }
+      50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.8), inset 0 0 25px rgba(239, 68, 68, 0.4); }
+    }
+    .pulse-urgent {
+      animation: alertPulse 1.4s infinite ease-in-out;
+    }
+    /* Custom scrollbar for driver screen */
+    .driver-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .driver-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+  <!-- Top Helper Guidance for Side-by-Side Verification -->
+  <div class="w-full max-w-4xl flex items-center justify-between mb-4 px-2 text-xs">
+    <div class="flex items-center gap-2">
+      <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono font-semibold border border-indigo-500/30">MOBILE EDGE CLIENT</span>
+      <span class="text-slate-400">Connected to FleetDrive RFC 6455 Stream (<code class="text-slate-300">ws://localhost:5000/ws</code>)</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/dispatcher" target="_blank" class="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition font-medium">
+        <span>Open Central Dispatcher</span>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+      </a>
+      <span class="text-slate-600">•</span>
+      <button onclick="simulateUrgentOrderDemo()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition border border-slate-700">
+        ⚡ Test Local Alert
+      </button>
+    </div>
+  </div>
+
+  <!-- The Smartphone Mockup Frame -->
+  <div class="phone-frame">
+    
+    <!-- Dynamic Island / Speaker Notch -->
+    <div class="dynamic-island">
+      <div class="camera-lens"></div>
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/40 animate-pulse"></div>
+    </div>
+
+    <!-- Phone Status Bar -->
+    <div class="pt-3 px-7 pb-2 flex items-center justify-between text-[11px] font-semibold text-slate-300 select-none z-40">
+      <span id="statusBarTime">09:41</span>
+      <div class="flex items-center gap-2">
+        <span class="text-[9px] font-mono tracking-tighter px-1 py-0.5 rounded bg-slate-800 text-emerald-400">5G</span>
+        <!-- WiFi Icon -->
+        <svg class="w-3 h-3 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zm-2.829 2.828a3 3 0 00-4.242 0 1 1 0 01-1.415-1.414 5 5 0 017.072 0 1 1 0 01-1.415 1.414zM10 16a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+        <!-- Battery Icon -->
+        <div class="w-5 h-2.5 border border-slate-300 rounded-sm p-0.5 flex items-center">
+          <div class="h-full bg-emerald-400 rounded-2xs w-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- App Header -->
+    <div class="px-5 py-3 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur flex items-center justify-between z-30">
+      <div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+          <h1 class="text-sm font-bold text-white tracking-tight">FleetDrive Driver</h1>
+        </div>
+        <div class="text-[11px] text-slate-400 font-mono mt-0.5">Yuvasri Eswara · driver1</div>
+      </div>
+      <div class="flex flex-col items-end">
+        <span id="wsStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>RFC 6455</span>
+        </span>
+        <span class="text-[9px] text-slate-400 font-mono mt-0.5">Tata Ace EV · 29 km/h</span>
+      </div>
+    </div>
+
+    <!-- Scrollable Driver App Content -->
+    <div class="flex-1 overflow-y-auto driver-scroll p-4 space-y-4">
+      
+      <!-- Current Status Banner -->
+      <div class="p-3 rounded-2xl glass-card border border-indigo-500/20 bg-gradient-to-r from-indigo-950/40 to-slate-900 flex items-center justify-between">
+        <div>
+          <div class="text-[10px] uppercase font-mono tracking-wider text-indigo-400">Active Shift</div>
+          <div class="text-xs font-semibold text-slate-200 mt-0.5">Chennai Metropolis Hub #2</div>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] font-mono text-slate-400">Route Progress</div>
+          <div id="routeProgressText" class="text-xs font-bold text-emerald-400 font-mono">1 / 5 Delivered</div>
+        </div>
+      </div>
+
+      <!-- Quick Exception Triggers (Fuel & Break) -->
+      <div>
+        <div class="text-[10px] uppercase font-mono tracking-wider text-slate-400 mb-1.5 px-1">Quick Operational Alerts</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btnFuelAlert" onclick="sendDriverException('FUEL_REQUEST')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 border border-slate-700 text-xs font-medium text-amber-300 flex items-center justify-center gap-1.5 transition">
+            <span>⛽ Fuel Stop</span>
+          </button>
+          <button id="btnBreakAlert" onclick="sendDriverException('BREAK_REQUEST')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 border border-slate-700 text-xs font-medium text-sky-300 flex items-center justify-center gap-1.5 transition">
+            <span>☕ 15m Break</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Stop Card -->
+      <div>
+        <div class="text-[10px] uppercase font-mono tracking-wider text-slate-400 mb-1.5 px-1 flex items-center justify-between">
+          <span>Current Delivery Stop</span>
+          <span class="text-emerald-400 font-semibold">EN ROUTE</span>
+        </div>
+
+        <div id="activeStopCard" class="p-4 rounded-2xl glass-card border border-emerald-500/30 bg-emerald-950/10 space-y-3 relative overflow-hidden">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" id="currentStopBadge">STOP #1</span>
+              <h3 id="currentCustomerName" class="text-sm font-bold text-white mt-1.5">Priya S</h3>
+              <p id="currentAddress" class="text-xs text-slate-300 leading-snug mt-0.5">Kasturba Nagar, 1st Cross St, Adyar, Chennai</p>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-mono text-slate-400">SLA Window</span>
+              <div id="currentTimeWindow" class="text-xs font-mono font-semibold text-emerald-400">10:30 - 11:30 AM</div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+            <span>Pkg: <span id="currentPkgId" class="text-slate-200">PKG-MED-01 (2.5 kg)</span></span>
+            <span class="text-slate-400">ETA: <span class="text-emerald-400 font-bold">12 min</span></span>
+          </div>
+
+          <!-- Mark Delivered Button (PoD) -->
+          <button id="btnMarkDelivered" onclick="completeCurrentDelivery()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span>Confirm Delivery & Upload PoD</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Upcoming Stops Queue -->
+      <div>
+        <div class="text-[10px] uppercase font-mono tracking-wider text-slate-400 mb-1.5 px-1 flex items-center justify-between">
+          <span>Scheduled Route Queue</span>
+          <span id="upcomingCount" class="text-slate-400 font-mono">4 Stops Left</span>
+        </div>
+
+        <div id="stopsListContainer" class="space-y-2">
+          <!-- Dynamic stop cards rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Telemetry & Live Telemetry Inspector inside phone -->
+      <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono space-y-1.5">
+        <div class="flex items-center justify-between text-slate-400">
+          <span>Driver Telemetry GPS:</span>
+          <span id="telemetryStatus" class="text-emerald-400">Broadcasting (4s)</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-300">
+          <span>Lat, Lng:</span>
+          <span id="liveCoords" class="text-indigo-400">13.0382°N, 80.2466°E</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-300">
+          <span>Speed & Heading:</span>
+          <span><span id="liveSpeed" class="text-amber-400">32.4</span> km/h · 88° E</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Phone Bottom Navigation Bar -->
+    <div class="h-14 bg-slate-950/95 border-t border-slate-800/80 px-6 flex items-center justify-around z-30">
+      <div class="flex flex-col items-center text-indigo-400 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        <span class="text-[9px] font-semibold mt-1">Route</span>
+      </div>
+      <div class="flex flex-col items-center text-slate-400 hover:text-slate-200 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        <span class="text-[9px] font-medium mt-1">Alerts</span>
+      </div>
+      <div class="flex flex-col items-center text-slate-400 hover:text-slate-200 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <span class="text-[9px] font-medium mt-1">Profile</span>
+      </div>
+    </div>
+
+    <!-- Phone Home Indicator Bar -->
+    <div class="py-1.5 flex justify-center bg-slate-950">
+      <div class="w-32 h-1 bg-slate-600 rounded-full"></div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- URGENT ORDER MODAL OVERLAY (Pulsing Red Priority Modal)   -->
+    <!-- ======================================================== -->
+    <div id="urgentModalOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col justify-end p-4 z-50 transition-all duration-300 hidden">
+      
+      <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-red-500/80 rounded-3xl p-5 shadow-2xl pulse-urgent space-y-4 relative overflow-hidden">
+        
+        <!-- Glowing Top Banner -->
+        <div class="flex items-center justify-between pb-3 border-b border-red-500/30">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
+            <span class="text-xs font-black tracking-wider text-red-400 uppercase font-mono">PRIORITY URGENT DISPATCH</span>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-300 border border-red-500/40">30m SLA</span>
+        </div>
+
+        <!-- Order Information Details -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-mono text-slate-400">CENTRAL DISPATCH ASSIGNMENT</div>
+          <h2 id="urgentCustomerTitle" class="text-base font-bold text-white tracking-tight leading-snug">Apollo Hospital Pharmacy</h2>
+          <p id="urgentAddressDesc" class="text-xs text-slate-300 leading-relaxed">Panagal Park, T. Nagar, Chennai</p>
+        </div>
+
+        <!-- AI Insertion Metadata -->
+        <div class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 space-y-1.5 text-xs font-mono">
+          <div class="flex items-center justify-between text-slate-300">
+            <span>Optimal Insertion:</span>
+            <span id="urgentOptimalStopText" class="text-emerald-400 font-bold">Stop #3 (Saves 25.2%)</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-300">
+            <span>Estimated Detour:</span>
+            <span class="text-amber-400">+7 min road duration</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-300">
+            <span>Package Specs:</span>
+            <span id="urgentWeightText" class="text-slate-200">1.2 kg (Medicine Express)</span>
+          </div>
+        </div>
+
+        <!-- Big Acknowledge Button -->
+        <button id="btnAcknowledgeUrgent" onclick="handleUrgentAcknowledge()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-sm shadow-xl shadow-red-600/40 flex items-center justify-center gap-2 transition">
+          <svg class="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Acknowledge & Resequence Route</span>
+        </button>
+
+        <p class="text-[10px] text-center font-mono text-slate-400">Transmits RFC 6455 ACK packet back to Central Control</p>
+      </div>
+
+    </div>
+
+    <!-- Notification Toast Popup -->
+    <div id="driverToast" class="absolute top-16 left-4 right-4 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white shadow-xl flex items-center gap-2.5 transition-all duration-300 opacity-0 pointer-events-none z-50">
+      <div id="toastIcon" class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">✓</div>
+      <div id="toastMessage" class="flex-1 font-medium">Notification message</div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // DRIVER MOBILE CLIENT LOGIC (RFC 6455)
+    // ==========================================
+    let ws = null;
+    let currentUrgentPacket = null;
+    let allOrders = [];
+    let currentStopIndex = 0;
+
+    // Clock in status bar
+    function updateClock() {
+      const now = new Date();
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('statusBarTime').textContent = `${hrs}:${mins}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // High-tech sound chime for Urgent Alert via Web Audio API
+    function playAlertChime() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch (e) {
+        // Fallback silently if audio context restricted
+      }
+    }
+
+    // Connect to WebSocket Server
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("🚗 [Driver Web] Connected to WebSocket stream:", wsUrl);
+        document.getElementById('wsStatusBadge').innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>RFC 6455: LIVE</span>
+        `;
+        // Register role as Driver
+        ws.send(JSON.stringify({
+          type: "REGISTER",
+          data: {
+            role: "driver",
+            driverId: "driver1",
+            driverName: "Yuvasri Eswara",
+            vehicle: "Tata Ace EV"
+          }
+        }));
+      };
+
+      ws.onclose = () => {
+        console.warn("⚠️ [Driver Web] WebSocket closed. Reconnecting in 3s...");
+        document.getElementById('wsStatusBadge').innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <span>OFFLINE</span>
+        `;
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const packet = JSON.parse(event.data);
+          console.log("📥 [Driver Web Received]:", packet);
+
+          // EVENT: URGENT ORDER DISPATCHED FROM CENTRAL CONTROL
+          if (packet.type === 'URGENT_ORDER_DISPATCHED') {
+            displayUrgentAlert(packet);
+          }
+
+          // EVENT: ROUTE RESEQUENCED
+          if (packet.type === 'ROUTE_RESEQUENCED') {
+            showToast("Route resequenced by Central Dispatch!", "🔄");
+            fetchOrders();
+          }
+
+        } catch (e) {
+          console.error("Packet parse error:", e);
+        }
+      };
+    }
+
+    // Display the Urgent Order Alert Modal
+    function displayUrgentAlert(packet) {
+      currentUrgentPacket = packet;
+      playAlertChime();
+
+      const data = packet.data || {};
+      document.getElementById('urgentCustomerTitle').textContent = data.customerName || data.name || "Priority Emergency Order";
+      document.getElementById('urgentAddressDesc').textContent = data.address || "Chennai Metropolis";
+      document.getElementById('urgentWeightText').textContent = `${data.weight || "1.2 kg"} (Express Medicine)`;
+
+      if (data.detourDelay) {
+        document.getElementById('urgentOptimalStopText').textContent = `Optimal Stop #3 (${data.detourDelay})`;
+      }
+
+      const modal = document.getElementById('urgentModalOverlay');
+      modal.classList.remove('hidden');
+    }
+
+    // Driver Acknowledges Urgent Order (Sends ACK_URGENT_ACCEPTED)
+    function handleUrgentAcknowledge() {
+      if (!currentUrgentPacket) return;
+
+      const packetId = currentUrgentPacket.packetId || `pkt-${Date.now()}`;
+      const urgentData = currentUrgentPacket.data || {};
+
+      // Transmit RFC 6455 ACK packet back to Central Dispatch
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: "ACK_URGENT_ACCEPTED",
+          packetId: packetId,
+          data: {
+            orderId: urgentData.id || urgentData.orderId || "ORD-URGENT",
+            driverId: "driver1",
+            driverName: "Yuvasri Eswara",
+            acceptedAt: new Date().toISOString()
+          }
+        }));
+        console.log("📤 Transmitted ACK_URGENT_ACCEPTED for packetId:", packetId);
+      }
+
+      // Hide modal
+      document.getElementById('urgentModalOverlay').classList.add('hidden');
+      showToast("Urgent order accepted! Route resequencing...", "🚨");
+
+      // Insert into local stops list
+      allOrders.splice(1, 0, {
+        id: urgentData.id || "ORD-URGENT",
+        customerName: urgentData.customerName || "Apollo Hospital Pharmacy",
+        address: urgentData.address || "Panagal Park, T. Nagar, Chennai",
+        timeWindow: "Express 30 mins",
+        status: "upcoming",
+        isUrgent: true,
+        weight: urgentData.weight || "1.2 kg"
+      });
+
+      renderStops();
+    }
+
+    // Complete Current Delivery (PoD)
+    async function completeCurrentDelivery() {
+      const activeOrder = allOrders[currentStopIndex];
+      if (!activeOrder) return;
+
+      try {
+        // Send REST update
+        await fetch(`/api/orders/${activeOrder.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' })
+        });
+
+        // Send WebSocket update
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "ORDER_STATUS_UPDATE",
+            data: {
+              orderId: activeOrder.id,
+              status: "completed",
+              driverId: "driver1"
+            }
+          }));
+        }
+
+        showToast(`Delivered: ${activeOrder.customerName}`, "✅");
+        activeOrder.status = "completed";
+        currentStopIndex++;
+        renderStops();
+
+      } catch (err) {
+        console.error("Failed to complete order:", err);
+      }
+    }
+
+    // Send Driver Exception Alert (Fuel / Break)
+    function sendDriverException(type) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showToast("WebSocket disconnected", "⚠️");
+        return;
+      }
+
+      const msg = type === 'FUEL_REQUEST'
+        ? "Emergency Fuel Stop Requested (Indian Oil, Adyar)"
+        : "Driver requested 15-minute rest break";
+
+      ws.send(JSON.stringify({
+        type: "DRIVER_EXCEPTION_ALERT",
+        data: {
+          type,
+          driverId: "driver1",
+          driverName: "Yuvasri Eswara",
+          message: msg,
+          timestamp: new Date().toISOString()
+        }
+      }));
+
+      showToast(`Alert sent to Dispatch: ${type === 'FUEL_REQUEST' ? 'Fuel Stop' : 'Break'}`, "⚠️");
+    }
+
+    // Fetch Initial Orders from Server
+    async function fetchOrders() {
+      try {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+        allOrders = data || [];
+        renderStops();
+      } catch (e) {
+        console.error("Could not fetch orders:", e);
+      }
+    }
+
+    // Render Stops in Phone UI
+    function renderStops() {
+      const active = allOrders.find(o => o.status === 'en_route') || allOrders[currentStopIndex] || allOrders[0];
+      const upcoming = allOrders.filter(o => o.id !== active?.id && o.status !== 'completed');
+      const completedCount = allOrders.filter(o => o.status === 'completed').length;
+
+      document.getElementById('routeProgressText').textContent = `${completedCount} / ${allOrders.length} Delivered`;
+      document.getElementById('upcomingCount').textContent = `${upcoming.length} Stops Left`;
+
+      if (active) {
+        document.getElementById('currentCustomerName').textContent = active.customerName;
+        document.getElementById('currentAddress').textContent = active.address;
+        document.getElementById('currentTimeWindow').textContent = active.timeWindow || "Scheduled";
+        document.getElementById('currentPkgId').textContent = `${active.packageId || active.id} (${active.weight || "2 kg"})`;
+        document.getElementById('currentStopBadge').textContent = `STOP #${currentStopIndex + 1}`;
+      }
+
+      const container = document.getElementById('stopsListContainer');
+      container.innerHTML = upcoming.map((stop, idx) => `
+        <div class="p-3 rounded-xl glass-card border ${stop.isUrgent ? 'border-red-500/50 bg-red-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2.5">
+            <span class="w-5 h-5 rounded-full ${stop.isUrgent ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-slate-800 text-slate-400'} flex items-center justify-center font-mono font-bold text-[10px]">
+              ${idx + 2}
+            </span>
+            <div>
+              <div class="font-semibold text-slate-200 flex items-center gap-1.5">
+                <span>${stop.customerName}</span>
+                ${stop.isUrgent ? '<span class="px-1 py-0.2 rounded text-[8px] bg-red-500 text-white font-mono font-bold">URGENT</span>' : ''}
+              </div>
+              <div class="text-[10px] text-slate-400 truncate max-w-[180px]">${stop.address}</div>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono text-slate-400">${stop.timeWindow || "Scheduled"}</span>
+        </div>
+      `).join('');
+    }
+
+    // Periodic GPS Telemetry Ping (4 seconds)
+    function startTelemetry() {
+      // Chennai route points
+      const waypoints = [
+        { lat: 13.0382, lng: 80.2466, speed: 32.4 },
+        { lat: 13.0395, lng: 80.2450, speed: 29.8 },
+        { lat: 13.0410, lng: 80.2415, speed: 34.1 },
+        { lat: 13.0430, lng: 80.2380, speed: 30.5 },
+        { lat: 13.0418, lng: 80.2341, speed: 28.2 }
+      ];
+      let ptIndex = 0;
+
+      setInterval(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const pt = waypoints[ptIndex % waypoints.length];
+        ptIndex++;
+
+        ws.send(JSON.stringify({
+          type: "LOCATION_PING",
+          data: {
+            lat: pt.lat,
+            lng: pt.lng,
+            speed: pt.speed,
+            heading: 88,
+            driverId: "driver1"
+          }
+        }));
+
+        document.getElementById('liveCoords').textContent = `${pt.lat.toFixed(4)}°N, ${pt.lng.toFixed(4)}°E`;
+        document.getElementById('liveSpeed').textContent = pt.speed.toFixed(1);
+      }, 4000);
+    }
+
+    // Show Notification Toast
+    function showToast(msg, icon = "✓") {
+      const toast = document.getElementById('driverToast');
+      document.getElementById('toastMessage').textContent = msg;
+      document.getElementById('toastIcon').textContent = icon;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Helper: Test Local Alert Demo
+    function simulateUrgentOrderDemo() {
+      displayUrgentAlert({
+        packetId: "demo-" + Date.now(),
+        data: {
+          customerName: "Apollo Hospital Pharmacy",
+          address: "Panagal Park, T. Nagar, Chennai",
+          weight: "1.2 kg",
+          detourDelay: "+7 min"
+        }
+      });
+    }
+
+    // Start App
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchOrders();
+      connectWebSocket();
+      startTelemetry();
+    });
+  </script>
+</body>
+</html>

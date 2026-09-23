@@ -128,12 +128,18 @@
       </div>
 
       <!-- Quick Action: Launch Driver App -->
-      <a href="/" target="_blank" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition">
+      <a href="/driver" target="_blank" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition">
         <span>Launch Driver App</span>
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
         </svg>
       </a>
+
+      <!-- Reset Demo Route Button -->
+      <button id="btnResetDemo" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-800 text-xs font-semibold transition" title="Reset Delivery Route to Clean 5 Stops">
+        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span>Reset Route</span>
+      </button>
 
       <!-- Sign Out Button (Feature 4) -->
       <button id="btnSignOut" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold transition" title="Sign Out of Dispatcher">
@@ -376,7 +382,7 @@
         <div id="dispatchSuccessBanner" class="hidden p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-200 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            <span>Packet sent! Waiting for Driver ACK...</span>
+            <span id="ackStatusLabel">Packet sent! Waiting for Driver ACK...</span>
           </div>
           <span id="ackTimer" class="font-mono text-emerald-400 font-bold">RTT: calculating</span>
         </div>
@@ -493,6 +499,28 @@
       sessionStorage.removeItem('fleetdrive_disp_auth');
       sessionStorage.removeItem('fleetdrive_disp_user');
       document.getElementById('dispatcherAuthModal').classList.remove('hidden');
+    };
+
+    document.getElementById('btnResetDemo').onclick = async () => {
+      try {
+        const res = await fetch('/api/demo/reset', { method: 'POST' });
+        if (res.ok) {
+          // Clear urgent input form fields
+          document.getElementById('inpCustomer').value = '';
+          document.getElementById('inpAddress').value = '';
+          document.getElementById('inpWeight').value = '1.5 kg';
+          document.getElementById('inpDeadline').value = '30 MINS (EXPRESS)';
+
+          // Hide dispatch banner
+          document.getElementById('dispatchSuccessBanner').classList.add('hidden');
+
+          // Refresh map and initial data
+          await fetchInitialData();
+          showDeliveryToast("Route reset to clean baseline (5 stops across Chennai)!");
+        }
+      } catch (err) {
+        console.error("Reset demo error:", err);
+      }
     };
 
     // ==========================================
@@ -701,6 +729,7 @@
             const banner = document.getElementById('dispatchSuccessBanner');
             banner.classList.remove('hidden');
             const rtt = packet.data?.rttMs ? `${packet.data.rttMs.toFixed(1)} ms` : '12.4 ms';
+            document.getElementById('ackStatusLabel').textContent = 'Packet Delivered! Driver Confirmed ACK';
             document.getElementById('ackTimer').textContent = `Driver ACK Received! RTT: ${rtt}`;
             document.getElementById('statRtt').textContent = rtt;
           }
@@ -990,7 +1019,8 @@
 
         const banner = document.getElementById('dispatchSuccessBanner');
         banner.classList.remove('hidden');
-        document.getElementById('ackTimer').textContent = 'Waiting for Driver ACK...';
+        document.getElementById('ackStatusLabel').textContent = 'Packet sent! Waiting for Driver ACK...';
+        document.getElementById('ackTimer').textContent = 'Calculating RTT...';
       }
 
       // 3. Trigger AI optimization for this new urgent order

@@ -31,6 +31,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined>;
   updateOrderSequence(reorderedOrders: Array<{ id: string; sequenceOrder: number; status?: string }>): Promise<Order[]>;
+  resetOrders(initialOrders: InsertOrder[]): Promise<Order[]>;
 
   // Driver Telemetry
   getDriverTelemetry(driverId: string): Promise<DriverTelemetry | undefined>;
@@ -127,6 +128,7 @@ export class FileStorage implements IStorage {
 
   // Orders
   async getOrders(): Promise<Order[]> {
+    this.data = this.loadData();
     return [...this.data.orders].sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0));
   }
 
@@ -184,6 +186,29 @@ export class FileStorage implements IStorage {
         }
       }
     }
+    this.saveData();
+    return this.getOrders();
+  }
+
+  async resetOrders(initialOrders: InsertOrder[]): Promise<Order[]> {
+    this.data.orders = initialOrders.map((order, idx) => ({
+      id: order.id || `ORD-${3001 + idx}`,
+      customerName: order.customerName,
+      address: order.address,
+      lat: order.lat,
+      lng: order.lng,
+      status: order.status || (idx === 0 ? "en_route" : "upcoming"),
+      isUrgent: order.isUrgent ?? false,
+      packageId: order.packageId || `PKG-5510${idx + 1}`,
+      weight: order.weight || "2.5 kg",
+      timeWindow: order.timeWindow || "",
+      deadline: order.deadline || "",
+      sequenceOrder: order.sequenceOrder ?? idx + 1,
+      driverId: order.driverId || "driver1",
+      phone: order.phone || "",
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    }));
     this.saveData();
     return this.getOrders();
   }
@@ -309,6 +334,14 @@ export class DatabaseStorage implements IStorage {
         .update(orders)
         .set({ sequenceOrder: update.sequenceOrder, ...(update.status ? { status: update.status } : {}) })
         .where(eq(orders.id, update.id));
+    }
+    return this.getOrders();
+  }
+
+  async resetOrders(initialOrders: InsertOrder[]): Promise<Order[]> {
+    await db.delete(orders);
+    for (const order of initialOrders) {
+      await db.insert(orders).values(order);
     }
     return this.getOrders();
   }

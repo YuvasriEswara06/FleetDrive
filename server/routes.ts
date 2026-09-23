@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
-import { seedDatabase } from "./seed";
+import { seedDatabase, resetDatabase } from "./seed";
 import { geocodeAddress, getRoadMatrix, getRoadPolyline } from "./osm-client";
 import { optimizeRouteWithBenchmark } from "./ai-optimizer";
 import { wsManager } from "./websocket";
@@ -291,8 +291,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/demo/reset", async (_req, res) => {
     try {
       // Re-seed orders and telemetry to baseline
-      await seedDatabase();
-      const orders = await storage.getOrders();
+      const orders = await resetDatabase();
+      // Broadcast reset event so both Dispatcher and Driver immediately refresh
+      wsManager.broadcastToAll({
+        type: "ROUTE_RESEQUENCED",
+        data: { orders },
+        timestamp: new Date().toISOString(),
+      });
       return res.json({ message: "Demo data reset successfully", orders });
     } catch (error) {
       return res.status(500).json({ message: "Failed to reset demo data" });

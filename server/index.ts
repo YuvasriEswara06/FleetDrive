@@ -226,6 +226,7 @@ function setupErrorHandler(app: express.Application) {
   app.use("/dispatcher", express.static(dispatcherPath));
   app.get("/admin", (_req, res) => res.redirect("/dispatcher"));
   app.get("/dashboard", (_req, res) => res.redirect("/dispatcher"));
+  app.get("/driver", (_req, res) => res.sendFile(path.resolve(dispatcherPath, "driver.html")));
 
   configureExpoAndLanding(app);
 
