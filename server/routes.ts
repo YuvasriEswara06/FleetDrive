@@ -5,31 +5,45 @@ import { seedDatabase, resetDatabase } from "./seed";
 import { geocodeAddress, getRoadMatrix, getRoadPolyline } from "./osm-client";
 import { optimizeRouteWithBenchmark } from "./ai-optimizer";
 import { wsManager } from "./websocket";
+import {
+  generateToken,
+  verifyToken,
+  authenticateToken,
+  hashPassword,
+  verifyPassword,
+  type AuthenticatedRequest,
+} from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auto-seed on startup if needed
   seedDatabase().catch((e) => console.error("Auto-seed error:", e));
 
   // ==========================================
-  // AUTHENTICATION ROUTES
+  // AUTHENTICATION ROUTES (JWT & Cryptographic Security)
   // ==========================================
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
       if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+        return res.status(400).json({ error: "BAD_REQUEST", message: "Username and password are required" });
       }
 
       const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
-        return res.status(401).json({ message: "Invalid username or password" });
+      if (!user || !verifyPassword(password, user.password)) {
+        return res.status(401).json({ error: "UNAUTHORIZED", message: "Invalid username or password" });
       }
 
+      const token = generateToken(user);
       const { password: _, ...safeUser } = user;
-      return res.json({ user: safeUser });
+      return res.json({
+        token,
+        tokenType: "Bearer",
+        expiresIn: "4h",
+        user: safeUser,
+      });
     } catch (error) {
       console.error("Login error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ error: "INTERNAL_ERROR", message: "Internal server error" });
     }
   });
 
@@ -37,29 +51,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password, name, role, companyName, employeeId } = req.body;
       if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+        return res.status(400).json({ error: "BAD_REQUEST", message: "Username and password are required" });
       }
 
       const existing = await storage.getUserByUsername(username);
       if (existing) {
-        return res.status(409).json({ message: "Username already taken" });
+        return res.status(409).json({ error: "CONFLICT", message: "Username already taken" });
       }
 
+      const hashedPassword = hashPassword(password);
       const user = await storage.createUser({
         username,
-        password,
+        password: hashedPassword,
         name: name || username,
         role: role || "driver",
         companyName: companyName || "",
         employeeId: employeeId || "",
       });
 
+      const token = generateToken(user);
       const { password: _, ...safeUser } = user;
-      return res.json({ user: safeUser });
+      return res.status(201).json({
+        token,
+        tokenType: "Bearer",
+        expiresIn: "4h",
+        user: safeUser,
+      });
     } catch (error) {
       console.error("Signup error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ error: "INTERNAL_ERROR", message: "Internal server error" });
     }
+  });
+
+  // Verify active JWT token endpoint (for Postman / testing)
+  app.get("/api/auth/verify", authenticateToken, (req: AuthenticatedRequest, res) => {
+    return res.json({
+      valid: true,
+      user: req.user,
+      message: "Cryptographic JWT token successfully verified via HMAC-SHA256",
+    });
   });
 
   app.get("/api/auth/user/:id", async (req, res) => {
