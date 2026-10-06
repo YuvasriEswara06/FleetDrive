@@ -126,7 +126,7 @@ async function runE2ETest() {
         data: {
           orderId: packet.data.id,
           driverId: "driver1",
-          driverName: "Yuvasri Eswara",
+          driverName: "Kumar",
         },
       };
       driverWs.send(JSON.stringify(ackPacket));
@@ -164,7 +164,7 @@ async function runE2ETest() {
       type: "DRIVER_EXCEPTION_ALERT",
       data: {
         driverId: "driver1",
-        driverName: "Yuvasri Eswara",
+        driverName: "Kumar",
         type: "FUEL_REQUEST",
         message: "Emergency Fuel Stop Requested (Indian Oil, Adyar)",
         location: { lat: 13.0067, lng: 80.2571 },

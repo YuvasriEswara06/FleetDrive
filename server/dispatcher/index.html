@@ -53,59 +53,56 @@
       100% { transform: scale(2.2); opacity: 0; }
     }
     .driver-halo {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
-      background: rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.45);
       animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
     .driver-marker-pin {
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: #4F46E5;
       border: 2px solid #FFFFFF;
-      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.5);
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
       font-size: 13px;
     }
+
+    /* Stop Markers */
     .stop-marker-pin {
-      width: 24px;
-      height: 24px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
       background: #1E293B;
-      border: 2px solid #94A3B8;
-      color: #F8FAFC;
+      border: 2px solid #FFFFFF;
+      color: #FFFFFF;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 11px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-    html:not(.dark) .stop-marker-pin {
-      background: #FFFFFF;
-      border: 2px solid #475569;
-      color: #0F172A;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
     }
     .stop-marker-urgent {
       background: #E11D48 !important;
       border-color: #FFFFFF !important;
       color: #FFFFFF !important;
-      box-shadow: 0 0 12px rgba(225, 29, 72, 0.6);
+      box-shadow: 0 0 14px rgba(225, 29, 72, 0.8) !important;
     }
   </style>
 </head>
 
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans antialiased overflow-hidden transition-colors duration-200">
 
   <!-- ======================================================== -->
   <!-- 0. TOP NAVIGATION BAR                                    -->
   <!-- ======================================================== -->
-  <header class="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-5 flex items-center justify-between sticky top-0 z-40 transition-colors">
+  <header class="h-14 border-b border-slate-800 bg-slate-900/95 backdrop-blur px-5 flex items-center justify-between flex-shrink-0 z-40 transition-colors">
     <div class="flex items-center gap-4">
       <div class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
@@ -137,7 +134,7 @@
     </div>
 
     <!-- Right Actions -->
-    <div class="flex items-center gap-2.5">
+    <div class="flex items-center gap-2">
       <!-- Binary Protocol Benchmark Button -->
       <button id="btnOpenBinaryBenchmark" class="px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 text-xs font-medium border border-emerald-500/30 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,44 +172,41 @@
   </header>
 
   <!-- ======================================================== -->
-  <!-- 1. OPTIONAL DROPDOWN: 2-OPT BENCHMARK CARD (Collapsible) -->
+  <!-- 1. OPTIONAL: 2-OPT BENCHMARK DRAWER                      -->
   <!-- ======================================================== -->
-  <div id="optimizerDrawer" class="hidden bg-slate-900 border-b border-slate-800 p-4 transition-all">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+  <div id="optimizerDrawer" class="hidden bg-slate-900 border-b border-slate-800 p-3 transition-all flex-shrink-0 z-30">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
       <div>
         <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-400">D-TSPTW 2-Opt Algorithmic Benchmark</h3>
-        <p class="text-[11px] text-slate-400">Dynamic Urgent Order Insertion comparison against Baseline Naive Append</p>
+        <p class="text-[11px] text-slate-400">Dynamic Urgent Order Insertion vs Baseline Naive Append</p>
       </div>
       <div class="flex items-center gap-3">
-        <div class="flex items-center gap-4 text-xs font-mono">
-          <div class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            <span class="text-slate-400">Baseline Distance:</span> <span id="benchNaiveDist" class="text-rose-400 font-bold">61.5 km</span>
+        <div class="flex items-center gap-3 text-xs font-mono">
+          <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+            <span class="text-slate-400">Baseline:</span> <span id="benchNaiveDist" class="text-rose-400 font-bold">61.5 km</span>
           </div>
-          <div class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            <span class="text-slate-400">AI 2-Opt Distance:</span> <span id="benchAiDist" class="text-emerald-400 font-bold">46.3 km</span>
+          <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+            <span class="text-slate-400">AI 2-Opt:</span> <span id="benchAiDist" class="text-emerald-400 font-bold">46.3 km</span>
           </div>
-          <div class="bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-300 font-bold">
-            Savings: <span id="benchAiSavings">15.2 km (24.7%)</span>
+          <div class="bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/40 text-emerald-300 font-bold">
+            Saved: <span id="benchAiSavings">15.2 km (24.7%)</span>
           </div>
         </div>
-        <button id="btnRunOptimizer" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
-          Re-calculate
-        </button>
       </div>
     </div>
   </div>
 
   <!-- ======================================================== -->
-  <!-- 2. MAIN WORKSPACE (65% MAP, 35% DELIVERY OPERATIONS)     -->
+  <!-- 2. MAIN WORKSPACE (65% MAP, 35% OPERATIONS)              -->
   <!-- ======================================================== -->
-  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 
-    <!-- LEFT COLUMN: INTERACTIVE MAP & HUD (7.5 cols / ~65%) -->
-    <section class="lg:col-span-8 relative flex flex-col border-r border-slate-800 min-h-[500px] lg:min-h-0">
-      <div id="map" class="flex-1 w-full h-full"></div>
+    <!-- LEFT COLUMN: INTERACTIVE MAP & HUD (65% WIDTH) -->
+    <section class="w-full lg:w-[65%] relative flex flex-col border-r border-slate-800 h-full">
+      <div id="map" class="w-full h-full min-h-[400px]"></div>
 
-      <!-- Floating Driver Live HUD (Bottom Left) -->
-      <div class="absolute bottom-4 left-4 z-[500] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-xl p-3 shadow-2xl flex items-center gap-4 text-xs max-w-sm">
+      <!-- Floating Driver HUD (Kumar) -->
+      <div class="absolute bottom-4 left-4 z-[500] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-xl p-3 shadow-2xl flex items-center gap-3.5 text-xs max-w-sm">
         <div class="w-9 h-9 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 flex-shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
@@ -220,7 +214,7 @@
         </div>
         <div>
           <div class="font-bold text-white flex items-center gap-2">
-            Yuvasri Eswara <span class="text-[10px] text-indigo-300 font-mono">driver1</span>
+            Kumar <span class="text-[10px] text-indigo-300 font-mono">driver1</span>
           </div>
           <div class="text-slate-400 text-[11px] mt-0.5">
             Tata Ace EV &middot; <span id="hudSpeed" class="text-white font-mono font-semibold">26.5</span> km/h &middot; <span class="text-emerald-400 font-medium">En Route</span>
@@ -229,47 +223,94 @@
       </div>
     </section>
 
-    <!-- RIGHT COLUMN: DELIVERY QUEUE & URGENT DISPATCH (4.5 cols / ~35%) -->
-    <section class="lg:col-span-4 bg-slate-900/50 flex flex-col h-full overflow-hidden border-t lg:border-t-0 border-slate-800">
+    <!-- RIGHT COLUMN: URGENT DISPATCH & DELIVERY QUEUE (35% WIDTH) -->
+    <section class="w-full lg:w-[35%] bg-slate-900/60 flex flex-col h-full overflow-hidden border-t lg:border-t-0 border-slate-800">
       
-      <!-- Panel Header -->
-      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
-        <div>
+      <!-- CARD 1: URGENT DISPATCH PANEL (Lesser ratio, compact) -->
+      <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex-shrink-0">
+        <div class="flex items-center justify-between mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-rose-400">Urgent dispatch</h2>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">PUSH VIA WS</span>
+        </div>
+
+        <!-- 1-Click Presets -->
+        <div class="flex items-center gap-2 mb-2.5">
+          <span class="text-[10px] text-slate-500 font-semibold">Presets:</span>
+          <button id="presetApollo" type="button" class="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-[10px] text-indigo-300 font-medium border border-slate-700 transition">
+            Apollo Pharmacy (30m)
+          </button>
+          <button id="presetKauvery" type="button" class="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-[10px] text-indigo-300 font-medium border border-slate-700 transition">
+            Kauvery Hospital (25m)
+          </button>
+        </div>
+
+        <!-- Compact Form Details (From & To) -->
+        <form id="urgentDispatchInlineForm" class="space-y-2">
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div>
+              <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">From (Driver Hub)</label>
+              <input type="text" value="Kumar (Teynampet)" disabled class="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-slate-400 font-mono text-[11px] cursor-not-allowed">
+            </div>
+            <div>
+              <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">Customer / Facility</label>
+              <input id="inpCustomer" type="text" value="Apollo Hospital Pharmacy" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500" required>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-[11px]">
+            <div class="col-span-2">
+              <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">To (Destination Address)</label>
+              <input id="inpAddress" type="text" value="Panagal Park, T. Nagar, Chennai" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <div>
+              <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">SLA Window</label>
+              <input id="inpDeadline" type="text" value="30 MINS" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <button type="submit" id="btnDispatchUrgent" class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-600/30 transition flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Urgent dispatch (Push via WebSocket)
+          </button>
+        </form>
+
+        <!-- Live Connection Verification Banner -->
+        <div id="connectionVerifyBanner" class="hidden mt-2.5 p-2.5 rounded-lg bg-slate-950 border border-slate-800 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span id="verifyDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span id="verifyTitle" class="text-[11px] font-semibold text-slate-200">Waiting for Driver ACK...</span>
+            </div>
+            <span id="rttDisplay" class="font-mono text-xs font-bold text-amber-400">RTT: ...</span>
+          </div>
+          <p id="verifySub" class="text-[10px] text-slate-400 mt-0.5 font-mono">Packet routed over TCP WebSocket to Kumar</p>
+        </div>
+      </div>
+
+      <!-- CARD 2: ACTIVE DELIVERY QUEUE (Remaining Height) -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="p-3 border-b border-slate-800/80 bg-slate-900/40 flex items-center justify-between flex-shrink-0">
           <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
             Active Delivery Queue
             <span id="orderCountBadge" class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-mono text-[10px]">5 Orders</span>
           </h2>
-          <p class="text-[11px] text-slate-500 mt-0.5">Chennai Urban Delivery Route</p>
+          <span class="text-[10px] text-slate-500">Stops on Map (1–5)</span>
         </div>
 
-        <button id="btnOpenDispatchModal" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          + Dispatch Urgent
-        </button>
-      </div>
-
-      <!-- Live Two-Way Socket Verification Banner (Shows on Urgent Dispatch) -->
-      <div id="connectionVerifyBanner" class="hidden p-3.5 mx-4 mt-4 rounded-xl bg-slate-950 border border-slate-800 transition-all">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span id="verifyDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-            <span id="verifyTitle" class="text-xs font-semibold text-slate-200">Waiting for Driver ACK...</span>
-          </div>
-          <span id="rttDisplay" class="font-mono text-xs font-bold text-amber-400">RTT: ...</span>
+        <!-- Orders Scroll Area -->
+        <div id="ordersListContainer" class="flex-1 overflow-y-auto p-3 space-y-2">
+          <!-- Dynamically rendered order cards -->
         </div>
-        <p id="verifySub" class="text-[10px] text-slate-400 mt-1 font-mono">Packet disp-101 routed over TCP WebSocket to Driver client</p>
       </div>
 
-      <!-- Orders List Container -->
-      <div id="ordersListContainer" class="flex-1 overflow-y-auto p-4 space-y-2.5">
-        <!-- Dynamically rendered order cards -->
-      </div>
-
-      <!-- Fleet Overview Footer -->
-      <div class="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400 font-mono">
-        <div>Active Drivers: <span class="text-white font-bold">1</span> / 1</div>
+      <!-- Footer Stats -->
+      <div class="p-3 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between text-[11px] text-slate-400 font-mono flex-shrink-0">
+        <div>Driver: <span class="text-white font-bold">Kumar</span></div>
         <div>Protocol: <span class="text-indigo-400 font-bold">RFC 6455</span></div>
         <div>Auth: <span class="text-emerald-400 font-bold">JWT Bearer</span></div>
       </div>
@@ -279,105 +320,7 @@
   </main>
 
   <!-- ======================================================== -->
-  <!-- 3. URGENT DISPATCH MODAL                                 -->
-  <!-- ======================================================== -->
-  <div id="urgentDispatchModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-white">Dispatch Urgent Order</h3>
-            <p class="text-[11px] text-slate-400">Push high-priority packet & verify 2-way ACK loop</p>
-          </div>
-        </div>
-        <button id="btnCloseDispatchModal" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
-      </div>
-
-      <!-- 1-Click Demo Presets -->
-      <div class="mb-4">
-        <span class="text-[11px] font-semibold text-slate-400 block mb-2">1-Click Presets:</span>
-        <div class="grid grid-cols-2 gap-2">
-          <button id="presetApollo" class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 text-left transition">
-            <div class="text-xs font-bold text-indigo-300">Apollo Hospital</div>
-            <div class="text-[10px] text-slate-400">Panagal Park, T. Nagar (30m)</div>
-          </button>
-          <button id="presetKauvery" class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 text-left transition">
-            <div class="text-xs font-bold text-indigo-300">Kauvery Hospital</div>
-            <div class="text-[10px] text-slate-400">Alwarpet (Cardiac Emergency)</div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Form Inputs -->
-      <form id="urgentForm" class="space-y-3">
-        <div>
-          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Facility / Customer</label>
-          <input id="inpCustomer" type="text" value="Apollo Hospital Pharmacy" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
-        </div>
-        <div>
-          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Chennai Address</label>
-          <input id="inpAddress" type="text" value="Panagal Park, T. Nagar, Chennai" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Weight</label>
-            <input id="inpWeight" type="text" value="1.2 kg (Medicine)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-400 block mb-1">SLA Deadline</label>
-            <input id="inpDeadline" type="text" value="30 MINS (EXPRESS)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-          </div>
-        </div>
-
-        <button type="submit" id="btnDispatchUrgentSubmit" class="w-full py-2.5 mt-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-          PUSH URGENT PACKET VIA RFC 6455
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ======================================================== -->
-  <!-- 4. AUTHENTICATION MODAL (JWT Login Gate)                 -->
-  <!-- ======================================================== -->
-  <div id="dispatcherAuthModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-      <div class="text-center mb-5">
-        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
-        <h2 class="text-base font-bold text-white">Dispatcher Security Gate</h2>
-        <p class="text-xs text-slate-400 mt-1">Authenticate to receive HMAC-SHA256 JWT Token</p>
-      </div>
-
-      <div id="dispAuthError" class="hidden mb-4 p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300"></div>
-
-      <form id="dispatcherLoginForm" class="space-y-3">
-        <div>
-          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Username</label>
-          <input id="dispAuthUsername" type="text" value="dispatcher" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
-        </div>
-        <div>
-          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Password</label>
-          <input id="dispAuthPassword" type="password" value="admin123" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
-        </div>
-
-        <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition">
-          Authenticate & Obtain Bearer Token
-        </button>
-      </form>
-    </div>
-  <!-- ======================================================== -->
-  <!-- 5. BINARY PROTOCOL BENCHMARK MODAL (CN REVIEW STAR)       -->
+  <!-- 3. BINARY BENCHMARK AUDIT MODAL                          -->
   <!-- ======================================================== -->
   <div id="binaryBenchmarkModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
@@ -420,6 +363,40 @@
     </div>
   </div>
 
+  <!-- ======================================================== -->
+  <!-- 4. AUTHENTICATION MODAL (JWT Login Gate)                 -->
+  <!-- ======================================================== -->
+  <div id="dispatcherAuthModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+      <div class="text-center mb-5">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 class="text-base font-bold text-white">Dispatcher Security Gate</h2>
+        <p class="text-xs text-slate-400 mt-1">Authenticate to receive HMAC-SHA256 JWT Token</p>
+      </div>
+
+      <div id="dispAuthError" class="hidden mb-4 p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300"></div>
+
+      <form id="dispatcherLoginForm" class="space-y-3">
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Username</label>
+          <input id="dispAuthUsername" type="text" value="dispatcher" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-400 block mb-1">Password</label>
+          <input id="dispAuthPassword" type="password" value="admin123" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" required>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition">
+          Authenticate & Obtain Bearer Token
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -447,19 +424,20 @@
     function setTheme(theme) {
       if (theme === 'dark') {
         document.documentElement.classList.add('dark');
-        document.body.className = "bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200";
+        document.body.className = "bg-slate-950 text-slate-100 h-screen flex flex-col font-sans antialiased overflow-hidden transition-colors duration-200";
         document.getElementById('themeIcon').textContent = '☀️';
         localStorage.setItem('fleetdrive_theme', 'dark');
       } else {
         document.documentElement.classList.remove('dark');
-        document.body.className = "bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200";
+        document.body.className = "bg-slate-50 text-slate-900 h-screen flex flex-col font-sans antialiased overflow-hidden transition-colors duration-200";
         document.getElementById('themeIcon').textContent = '🌙';
         localStorage.setItem('fleetdrive_theme', 'light');
       }
+      if (map) setTimeout(() => map.invalidateSize(), 150);
     }
 
     // ==========================================
-    // 2. AUTHENTICATION & JWT TOKEN HANDLING
+    // 2. AUTHENTICATION & JWT TOKEN
     // ==========================================
     function getJwtToken() {
       return sessionStorage.getItem('fleetdrive_token') || '';
@@ -505,7 +483,7 @@
           return;
         }
 
-        // Store JWT Token & User Profile
+        // Store JWT Token
         sessionStorage.setItem('fleetdrive_token', data.token);
         sessionStorage.setItem('fleetdrive_user', JSON.stringify(data.user));
         document.getElementById('dispatcherAuthModal').classList.add('hidden');
@@ -531,6 +509,9 @@
     // 3. MAP INITIALIZATION (OpenStreetMap)
     // ==========================================
     function initMap() {
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) return;
+
       map = L.map('map', {
         center: [13.0382, 80.2466],
         zoom: 12,
@@ -542,26 +523,33 @@
         maxZoom: 19
       }).addTo(map);
 
-      // Driver icon
+      // Driver Marker (Kumar)
       const driverIcon = L.divIcon({
         className: 'custom-driver-icon',
         html: `
           <div class="relative flex items-center justify-center">
             <div class="absolute driver-halo"></div>
             <div class="driver-marker-pin z-10">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 19h20L12 2z"/></svg>
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 19h20L12 2z"/></svg>
             </div>
           </div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
       });
 
       driverMarker = L.marker([13.0382, 80.2466], { icon: driverIcon }).addTo(map);
+      driverMarker.bindPopup("<b>Driver: Kumar</b><br>Tata Ace EV &middot; En Route");
+
+      // Invalidate size on window resize
+      window.addEventListener('resize', () => {
+        if (map) map.invalidateSize();
+      });
+      setTimeout(() => map.invalidateSize(), 300);
     }
 
     // ==========================================
-    // 4. WEBSOCKET FULL-DUPLEX TCP CONNECTION
+    // 4. WEBSOCKET CONNECTION
     // ==========================================
     function connectWebSocket() {
       const token = getJwtToken();
@@ -574,7 +562,6 @@
         console.log("📡 Connected to WebSocket on:", wsUrl);
         document.getElementById('connectionPill').classList.remove('hidden');
 
-        // Register with JWT
         ws.send(JSON.stringify({
           type: "REGISTER",
           token: token,
@@ -608,7 +595,7 @@
         }
       }
 
-      // 2. URGENT ORDER ACKNOWLEDGMENT (Connection Verified!)
+      // 2. URGENT ORDER ACKNOWLEDGED (Two-way Connection Verified!)
       if (packet.type === 'URGENT_ORDER_ACKNOWLEDGED') {
         const rtt = packet.data?.rttMs || 2.8;
         const banner = document.getElementById('connectionVerifyBanner');
@@ -618,11 +605,11 @@
         const sub = document.getElementById('verifySub');
 
         banner.classList.remove('hidden');
-        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400";
         title.textContent = "✅ Two-Way Connection Verified!";
         rttDisplay.className = "font-mono text-xs font-bold text-emerald-400";
         rttDisplay.textContent = `RTT: ${rtt.toFixed(1)} ms`;
-        sub.textContent = "Driver mobile app acknowledged reception over RFC 6455 stream";
+        sub.textContent = "Driver Kumar acknowledged reception over RFC 6455 stream";
 
         fetchInitialData();
       }
@@ -639,7 +626,7 @@
     }
 
     // ==========================================
-    // 5. FETCH & RENDER DATA
+    // 5. FETCH & RENDER ORDERS AND MAP POINTS
     // ==========================================
     async function fetchInitialData() {
       const token = getJwtToken();
@@ -673,7 +660,7 @@
         const isEnRoute = order.status === 'en_route';
 
         return `
-          <div class="p-3 rounded-xl ${isUrgent ? 'bg-rose-950/20 border border-rose-500/40' : 'bg-slate-950/70 border border-slate-800'} transition hover:border-slate-700">
+          <div class="p-2.5 rounded-xl ${isUrgent ? 'bg-rose-950/20 border border-rose-500/40' : 'bg-slate-950/70 border border-slate-800'} transition hover:border-slate-700">
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center gap-2">
                 <span class="w-5 h-5 rounded-full ${isUrgent ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'} flex items-center justify-center text-[10px] font-bold font-mono">
@@ -686,7 +673,7 @@
               </span>
             </div>
             <div class="text-[11px] text-slate-400 pl-7 truncate">${order.address}</div>
-            <div class="text-[10px] text-slate-500 pl-7 mt-1 flex items-center justify-between">
+            <div class="text-[10px] text-slate-500 pl-7 mt-0.5 flex items-center justify-between">
               <span>Weight: ${order.weight || '2.0 kg'}</span>
               <span>SLA: ${order.deadline || 'On Time'}</span>
             </div>
@@ -696,33 +683,47 @@
     }
 
     function renderMapMarkers(orders) {
+      if (!map) return;
       stopMarkers.forEach(m => map.removeLayer(m));
       stopMarkers = [];
 
       orders.forEach((order, idx) => {
-        if (!order.latitude || !order.longitude) return;
+        // Robust coordinate resolution
+        const lat = Number(order.lat ?? order.latitude);
+        const lng = Number(order.lng ?? order.longitude);
+
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
 
         const isUrgent = order.isUrgent;
         const icon = L.divIcon({
           className: 'custom-stop-marker',
           html: `<div class="stop-marker-pin ${isUrgent ? 'stop-marker-urgent' : ''}">${idx + 1}</div>`,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
         });
 
-        const marker = L.marker([order.latitude, order.longitude], { icon }).addTo(map);
-        marker.bindPopup(`<b>Stop #${idx + 1}: ${order.customerName}</b><br>${order.address}`);
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        marker.bindPopup(`<b>Stop #${idx + 1}: ${order.customerName}</b><br>${order.address}<br><b>Status:</b> ${order.status}`);
         stopMarkers.push(marker);
       });
+
+      // Fit bounds to show driver and all stops
+      if (stopMarkers.length > 0 && driverMarker) {
+        const group = L.featureGroup([driverMarker, ...stopMarkers]);
+        map.fitBounds(group.getBounds().pad(0.12));
+      }
     }
 
     async function drawRoutePolyline() {
-      if (!allOrders.length) return;
+      if (!map || !allOrders.length) return;
       const token = getJwtToken();
 
       const points = [
         currentDriverLocation,
-        ...allOrders.filter(o => o.status !== 'completed' && o.latitude).map(o => ({ lat: o.latitude, lng: o.longitude }))
+        ...allOrders
+          .filter(o => o.status !== 'completed')
+          .map(o => ({ lat: Number(o.lat ?? o.latitude), lng: Number(o.lng ?? o.longitude) }))
+          .filter(p => !isNaN(p.lat) && !isNaN(p.lng) && p.lat !== 0 && p.lng !== 0)
       ];
 
       if (points.length < 2) return;
@@ -749,42 +750,35 @@
     }
 
     // ==========================================
-    // 6. URGENT DISPATCH ACTION & VERIFICATION
+    // 6. URGENT DISPATCH INLINE ACTION (No Popup Overlay)
     // ==========================================
-    const dispatchModal = document.getElementById('urgentDispatchModal');
-    document.getElementById('btnOpenDispatchModal').onclick = () => dispatchModal.classList.remove('hidden');
-    document.getElementById('btnCloseDispatchModal').onclick = () => dispatchModal.classList.add('hidden');
-
     document.getElementById('presetApollo').onclick = () => {
       document.getElementById('inpCustomer').value = "Apollo Hospital Pharmacy";
       document.getElementById('inpAddress').value = "Panagal Park, T. Nagar, Chennai";
-      document.getElementById('inpWeight').value = "1.2 kg (Medicine)";
       document.getElementById('inpDeadline').value = "30 MINS (EXPRESS)";
     };
 
     document.getElementById('presetKauvery').onclick = () => {
       document.getElementById('inpCustomer').value = "Kauvery Hospital Express";
       document.getElementById('inpAddress').value = "Alwarpet, Chennai";
-      document.getElementById('inpWeight').value = "0.8 kg (Cardiac Supplies)";
       document.getElementById('inpDeadline').value = "25 MINS (EMERGENCY)";
     };
 
-    document.getElementById('urgentForm').onsubmit = async (e) => {
+    document.getElementById('urgentDispatchInlineForm').onsubmit = async (e) => {
       e.preventDefault();
       const customerName = document.getElementById('inpCustomer').value.trim();
       const address = document.getElementById('inpAddress').value.trim();
-      const weight = document.getElementById('inpWeight').value.trim();
       const deadline = document.getElementById('inpDeadline').value.trim();
 
       const urgentPayload = {
         id: "ORD-URG-" + Math.floor(1000 + Math.random() * 9000),
         customerName,
         address,
-        weight,
+        weight: "1.2 kg",
         deadline,
         isUrgent: true,
-        latitude: 13.0418,
-        longitude: 80.2341,
+        lat: 13.0418,
+        lng: 80.2341,
         status: "upcoming"
       };
 
@@ -796,10 +790,10 @@
       const sub = document.getElementById('verifySub');
 
       banner.classList.remove('hidden');
-      dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
-      title.textContent = `Dispatched to Driver: ${customerName}`;
+      dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+      title.textContent = `Dispatched to Kumar: ${customerName}`;
       rttDisplay.textContent = "Waiting for ACK...";
-      sub.textContent = "Transmitting RFC 6455 WebSocket frame to Driver mobile viewport...";
+      sub.textContent = "Transmitting RFC 6455 WebSocket frame to Kumar...";
 
       // 2. Transmit over WebSocket
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -809,8 +803,6 @@
           timestamp: new Date().toISOString()
         }));
       }
-
-      dispatchModal.classList.add('hidden');
     };
 
     // Reset Demo
@@ -830,16 +822,17 @@
       }
     };
 
-    // Toggle Binary Benchmark Modal
-    const binaryModal = document.getElementById('binaryBenchmarkModal');
-    document.getElementById('btnOpenBinaryBenchmark').onclick = () => binaryModal.classList.remove('hidden');
-    document.getElementById('btnCloseBinaryModal').onclick = () => binaryModal.classList.add('hidden');
-
     // Toggle Optimizer Drawer
     document.getElementById('btnToggleOptimizer').onclick = () => {
       const drawer = document.getElementById('optimizerDrawer');
       drawer.classList.toggle('hidden');
+      if (map) setTimeout(() => map.invalidateSize(), 150);
     };
+
+    // Binary Benchmark Modal
+    const binaryModal = document.getElementById('binaryBenchmarkModal');
+    document.getElementById('btnOpenBinaryBenchmark').onclick = () => binaryModal.classList.remove('hidden');
+    document.getElementById('btnCloseBinaryModal').onclick = () => binaryModal.classList.add('hidden');
 
     // ==========================================
     // INITIALIZATION

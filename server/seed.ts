@@ -95,7 +95,7 @@ export async function seedDatabase() {
     await storage.createUser({
       username: "driver1",
       password: "driver123",
-      name: "Yuvasri Eswara",
+      name: "Kumar",
       role: "driver",
       companyName: "FleetDrive Urban Logistics",
       employeeId: "FD-7701",
