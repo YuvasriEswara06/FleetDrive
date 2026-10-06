@@ -138,6 +138,14 @@
 
     <!-- Right Actions -->
     <div class="flex items-center gap-2.5">
+      <!-- Binary Protocol Benchmark Button -->
+      <button id="btnOpenBinaryBenchmark" class="px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 text-xs font-medium border border-emerald-500/30 transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        <span class="hidden md:inline">Binary vs JSON (-87.7%)</span>
+      </button>
+
       <!-- Route Optimizer Toggle Button -->
       <button id="btnToggleOptimizer" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -367,6 +375,48 @@
           Authenticate & Obtain Bearer Token
         </button>
       </form>
+    </div>
+  <!-- ======================================================== -->
+  <!-- 5. BINARY PROTOCOL BENCHMARK MODAL (CN REVIEW STAR)       -->
+  <!-- ======================================================== -->
+  <div id="binaryBenchmarkModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold text-sm border border-emerald-500/30">
+            01
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Application Layer Serialization Audit</h3>
+            <p class="text-[11px] text-slate-400">UTF-8 Text JSON vs. Packed Binary Buffer (IEEE 754)</p>
+          </div>
+        </div>
+        <button id="btnCloseBinaryModal" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-4 font-mono text-xs">
+        <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400 font-semibold mb-1">Standard UTF-8 JSON</div>
+          <div class="text-lg font-bold text-rose-400">138 Bytes</div>
+          <p class="text-[10px] text-slate-500 mt-1">Repeats keys & punctuation</p>
+        </div>
+        <div class="bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-500/40">
+          <div class="text-[11px] text-emerald-400 font-semibold mb-1">Packed Binary Frame</div>
+          <div class="text-lg font-bold text-emerald-300">17 Bytes</div>
+          <p class="text-[10px] text-emerald-400/80 mt-1">87.7% Cellular Bandwidth Saved</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 mb-4 space-y-1.5">
+        <div class="flex justify-between"><span class="text-slate-500">Event Type:</span> <span class="text-white">LOCATION_PING</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Binary Opcode:</span> <span class="text-emerald-400">0x01</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">Hex Payload Preview:</span> <span class="text-indigo-400 font-mono">0x01789c5041427ea04209...</span></div>
+        <div class="flex justify-between pt-1.5 border-t border-slate-800"><span class="text-slate-400">100 Drivers / 1 Hr Savings:</span> <span class="text-emerald-300 font-bold">20.8 MB Saved</span></div>
+      </div>
+
+      <div class="text-[11px] text-slate-400 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+        <b class="text-slate-200">Computer Networks Concept:</b> Binary serialization strips ASCII field labels and transmits raw IEEE 754 32-bit floats directly over the TCP stream, eliminating CPU string parsing and cellular packet overhead.
+      </div>
     </div>
   </div>
 
@@ -779,6 +829,11 @@
         console.error("Reset failed:", e);
       }
     };
+
+    // Toggle Binary Benchmark Modal
+    const binaryModal = document.getElementById('binaryBenchmarkModal');
+    document.getElementById('btnOpenBinaryBenchmark').onclick = () => binaryModal.classList.remove('hidden');
+    document.getElementById('btnCloseBinaryModal').onclick = () => binaryModal.classList.add('hidden');
 
     // Toggle Optimizer Drawer
     document.getElementById('btnToggleOptimizer').onclick = () => {

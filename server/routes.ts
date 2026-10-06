@@ -315,6 +315,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Application Layer Protocol Serialization Benchmark (JSON vs Packed Binary)
+  app.get("/api/network/serialization-benchmark", async (_req, res) => {
+    const samplePayload = {
+      type: "LOCATION_PING",
+      driverId: "driver1",
+      lat: 13.0382,
+      lng: 80.2466,
+      speed: 26.5,
+      heading: 85.0,
+      timestamp: new Date().toISOString(),
+    };
+
+    const jsonString = JSON.stringify(samplePayload);
+    const jsonBytes = Buffer.byteLength(jsonString, "utf8");
+
+    // Compact Binary Packing (IEEE 754 Float32 + Int16 + Timestamp)
+    // 1B opcode + 4B lat + 4B lng + 2B speed + 2B heading + 4B epoch sec = 17 Bytes
+    const binaryBuffer = Buffer.alloc(17);
+    binaryBuffer.writeUInt8(0x01, 0); // Opcode 0x01 = LOCATION_PING
+    binaryBuffer.writeFloatLE(samplePayload.lat, 1);
+    binaryBuffer.writeFloatLE(samplePayload.lng, 5);
+    binaryBuffer.writeUInt16LE(Math.round(samplePayload.speed * 10), 9);
+    binaryBuffer.writeUInt16LE(Math.round(samplePayload.heading * 10), 11);
+    binaryBuffer.writeUInt32LE(Math.floor(Date.now() / 1000), 13);
+    const binaryBytes = binaryBuffer.length;
+
+    const savedPercent = ((1 - binaryBytes / jsonBytes) * 100).toFixed(1);
+    const fleetHourlyMbJson = ((jsonBytes * 1800 * 100) / (1024 * 1024)).toFixed(1);
+    const fleetHourlyMbBinary = ((binaryBytes * 1800 * 100) / (1024 * 1024)).toFixed(1);
+
+    return res.json({
+      protocol: "RFC-6455-FLEETSYNC",
+      event: "LOCATION_PING",
+      jsonSerialization: {
+        format: "UTF-8 Text JSON",
+        byteSize: jsonBytes,
+        sample: samplePayload,
+      },
+      binarySerialization: {
+        format: "Packed Binary Buffer (IEEE 754 Float32)",
+        byteSize: binaryBytes,
+        hexPreview: "0x" + binaryBuffer.toString("hex"),
+      },
+      metrics: {
+        reductionPercent: `${savedPercent}%`,
+        bandwidthSavedPerFrameBytes: jsonBytes - binaryBytes,
+        fleetProjection100Drivers1Hour: {
+          jsonBandwidthMb: `${fleetHourlyMbJson} MB`,
+          binaryBandwidthMb: `${fleetHourlyMbBinary} MB`,
+          savedBandwidthMb: `${(parseFloat(fleetHourlyMbJson) - parseFloat(fleetHourlyMbBinary)).toFixed(1)} MB`,
+        },
+      },
+      conclusion: "Binary protocol buffers eliminate JSON key repetitions and syntax overhead, cutting cellular bandwidth by >80%.",
+    });
+  });
+
   // ==========================================
   // DEMO RESET ENDPOINT
   // ==========================================
