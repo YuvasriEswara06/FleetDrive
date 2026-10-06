@@ -366,10 +366,33 @@
       }
     }
 
-    // Connect to WebSocket Server
-    function connectWebSocket() {
+    let driverJwtToken = sessionStorage.getItem('fleetdrive_driver_token') || '';
+
+    async function ensureDriverAuth() {
+      if (!driverJwtToken) {
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'driver1', password: 'driver123' })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            driverJwtToken = data.token;
+            sessionStorage.setItem('fleetdrive_driver_token', driverJwtToken);
+          }
+        } catch (e) {
+          console.error("Driver auth error:", e);
+        }
+      }
+      return driverJwtToken;
+    }
+
+    // Connect to WebSocket Server with JWT
+    async function connectWebSocket() {
+      await ensureDriverAuth();
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(driverJwtToken)}`;
 
       ws = new WebSocket(wsUrl);
 
@@ -377,16 +400,18 @@
         console.log("🚗 [Driver Web] Connected to WebSocket stream:", wsUrl);
         document.getElementById('wsStatusBadge').innerHTML = `
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>RFC 6455: LIVE</span>
+          <span>RFC 6455: LIVE (JWT)</span>
         `;
-        // Register role as Driver
+        // Register role as Driver with JWT
         ws.send(JSON.stringify({
           type: "REGISTER",
+          token: driverJwtToken,
           data: {
             role: "driver",
             driverId: "driver1",
             driverName: "Yuvasri Eswara",
-            vehicle: "Tata Ace EV"
+            vehicle: "Tata Ace EV",
+            token: driverJwtToken
           }
         }));
       };
@@ -543,9 +568,12 @@
     // Fetch Initial Orders from Server
     async function fetchOrders() {
       try {
-        const res = await fetch('/api/orders');
+        const token = await ensureDriverAuth();
+        const res = await fetch('/api/orders', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         const data = await res.json();
-        allOrders = data || [];
+        allOrders = data.orders || data || [];
         renderStops();
       } catch (e) {
         console.error("Could not fetch orders:", e);
