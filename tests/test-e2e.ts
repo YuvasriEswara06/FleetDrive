@@ -50,6 +50,7 @@ async function runE2ETest() {
   let urgentReceivedByDriver = false;
   let ackReceivedByDispatcher = false;
   let exceptionAlertReceived = false;
+  let exceptionAckReceivedByDriver = false;
   let orderStatusChangedReceived = false;
   let routeResequencedReceived = false;
 
@@ -133,6 +134,11 @@ async function runE2ETest() {
       console.log("📲 Driver transmitted ACK_URGENT_ACCEPTED packet back to Dispatcher!");
     }
 
+    if (packet.type === "EXCEPTION_ACK_RECEIVED") {
+      exceptionAckReceivedByDriver = true;
+      console.log(`✅ Driver received EXCEPTION_ACK_RECEIVED from Dispatcher! (${packet.data?.status || 'APPROVED'})`);
+    }
+
     if (packet.type === "ROUTE_RESEQUENCED") {
       routeResequencedReceived = true;
       console.log("🔄 Driver received ROUTE_RESEQUENCED broadcast!");
@@ -168,6 +174,22 @@ async function runE2ETest() {
         type: "FUEL_REQUEST",
         message: "Emergency Fuel Stop Requested (Indian Oil, Adyar)",
         location: { lat: 13.0067, lng: 80.2571 },
+      },
+    })
+  );
+
+  await new Promise((r) => setTimeout(r, 300));
+
+  // Dispatcher sends ACK_DRIVER_EXCEPTION back to Driver
+  dispatcherWs.send(
+    JSON.stringify({
+      type: "ACK_DRIVER_EXCEPTION",
+      data: {
+        exceptionType: "FUEL_REQUEST",
+        driverId: "driver1",
+        driverName: "Kumar",
+        status: "APPROVED",
+        message: "Central Dispatch approved fuel stop",
       },
     })
   );
@@ -232,6 +254,7 @@ async function runE2ETest() {
   console.log(`- Driver & Dispatcher Sockets:         ${driverRegistered && dispatcherRegistered ? "✅ PASS" : "❌ FAIL"}`);
   console.log(`- GPS Telemetry Stream:                ${locationReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
   console.log(`- Feature 2: Driver Exception Alert:   ${exceptionAlertReceived ? "✅ PASS" : "❌ FAIL"}`);
+  console.log(`- Feature 2: Exception ACK Received:   ${exceptionAckReceivedByDriver ? "✅ PASS" : "❌ FAIL"}`);
   console.log(`- Urgent Order Pushed:                 ${urgentReceivedByDriver ? "✅ PASS" : "❌ FAIL"}`);
   console.log(`- Urgent Order Acknowledged (RTT):     ${ackReceivedByDispatcher ? "✅ PASS" : "❌ FAIL"}`);
   console.log(`- Feature 1: Order Completed Sync:     ${orderStatusChangedReceived ? "✅ PASS" : "❌ FAIL"}`);

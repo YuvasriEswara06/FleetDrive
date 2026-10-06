@@ -203,6 +203,37 @@
 
     <!-- LEFT COLUMN: INTERACTIVE MAP & HUD (65% WIDTH) -->
     <section class="w-full lg:w-[65%] relative flex flex-col border-r border-slate-800 h-full">
+      
+      <!-- DRIVER EXCEPTION ALERT NOTIFICATION (Fuel Stop / 15m Break) -->
+      <div id="driverExceptionBanner" class="hidden absolute top-4 left-4 right-4 z-[600] p-3.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/50 shadow-2xl transition-all">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl p-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30" id="exceptionIcon">⛽</span>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-xs uppercase tracking-wider text-amber-300" id="exceptionTitle">DRIVER FUEL STOP REQUEST</span>
+                <span id="exceptionBadge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">ACTION REQUIRED</span>
+              </div>
+              <p class="text-xs text-slate-200 mt-0.5 font-medium" id="exceptionMsg">Driver Kumar requested emergency fuel stop</p>
+              <div class="flex items-center gap-2 text-[10px] font-mono text-slate-400 mt-0.5">
+                <span>Driver: <strong class="text-white">Kumar (driver1)</strong></span>
+                <span>&bull;</span>
+                <span id="exceptionTime">RFC 6455 Stream</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+            <button id="btnApproveException" onclick="approveDriverException()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs rounded-lg shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span>Approve & ACK</span>
+            </button>
+            <button id="btnDismissException" onclick="dismissDriverException()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-medium text-xs rounded-lg border border-slate-700 transition">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div id="map" class="w-full h-full min-h-[400px]"></div>
 
       <!-- Floating Driver HUD (Kumar) -->
@@ -623,6 +654,117 @@
       if (packet.type === 'ROUTE_RESEQUENCED') {
         fetchInitialData();
       }
+
+      // 5. DRIVER EXCEPTION ALERT (Fuel Stop / 15m Break)
+      if (packet.type === 'DRIVER_EXCEPTION_ALERT') {
+        const data = packet.data || {};
+        showDriverExceptionAlert(data.type, data.message, data.driverName, data.timestamp);
+      }
+    }
+
+    // ==========================================
+    // 4B. DRIVER EXCEPTION HANDLING & TWO-WAY APPROVAL
+    // ==========================================
+    let currentPendingException = null;
+
+    function playAlertTone(freq = 660) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      } catch (e) {}
+    }
+
+    function showDriverExceptionAlert(type, message, driverName, timestamp) {
+      playAlertTone(660);
+      currentPendingException = { type, message, driverName, timestamp };
+      const banner = document.getElementById('driverExceptionBanner');
+      const icon = document.getElementById('exceptionIcon');
+      const title = document.getElementById('exceptionTitle');
+      const msg = document.getElementById('exceptionMsg');
+      const timeEl = document.getElementById('exceptionTime');
+      const badge = document.getElementById('exceptionBadge');
+
+      if (type === 'FUEL_REQUEST') {
+        icon.textContent = '⛽';
+        title.textContent = 'DRIVER FUEL STOP REQUEST';
+        title.className = 'font-bold text-xs uppercase tracking-wider text-amber-300';
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse';
+        badge.textContent = 'FUEL STOP ALERT';
+        banner.className = 'absolute top-4 left-4 right-4 z-[600] p-3.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/50 shadow-2xl transition-all';
+      } else if (type === 'BREAK_REQUEST') {
+        icon.textContent = '☕';
+        title.textContent = 'DRIVER REST BREAK REQUEST (15m)';
+        title.className = 'font-bold text-xs uppercase tracking-wider text-sky-300';
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 text-sky-300 border border-sky-500/30 animate-pulse';
+        badge.textContent = 'REST BREAK ALERT';
+        banner.className = 'absolute top-4 left-4 right-4 z-[600] p-3.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-sky-500/50 shadow-2xl transition-all';
+      } else {
+        icon.textContent = '⚠️';
+        title.textContent = 'DRIVER OPERATIONAL EXCEPTION';
+        title.className = 'font-bold text-xs uppercase tracking-wider text-amber-300';
+        badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse';
+        badge.textContent = 'ALERT';
+        banner.className = 'absolute top-4 left-4 right-4 z-[600] p-3.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/50 shadow-2xl transition-all';
+      }
+
+      msg.textContent = message || `Driver ${driverName || 'Kumar'} sent an operational exception alert.`;
+      const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+      timeEl.textContent = `Transmitted via RFC 6455 at ${timeStr}`;
+
+      document.getElementById('btnApproveException').classList.remove('hidden');
+      banner.classList.remove('hidden');
+    }
+
+    function approveDriverException() {
+      if (!currentPendingException) return;
+
+      // 1. Transmit ACK back to Driver over WebSocket
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: "ACK_DRIVER_EXCEPTION",
+          data: {
+            exceptionType: currentPendingException.type,
+            driverId: "driver1",
+            driverName: currentPendingException.driverName || "Kumar",
+            status: "APPROVED",
+            message: `Central Dispatch approved ${currentPendingException.type === 'FUEL_REQUEST' ? 'Emergency Fuel Stop' : '15m Rest Break'}`,
+            timestamp: new Date().toISOString()
+          }
+        }));
+      }
+
+      // 2. Update banner to show Approved status
+      const title = document.getElementById('exceptionTitle');
+      const msg = document.getElementById('exceptionMsg');
+      const badge = document.getElementById('exceptionBadge');
+      title.textContent = "✅ EXCEPTION APPROVED & ACK TRANSMITTED";
+      title.className = "font-bold text-xs uppercase tracking-wider text-emerald-400";
+      badge.className = "px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+      badge.textContent = "ACKNOWLEDGED";
+      msg.textContent = `Approval ACK frame pushed over WebSocket to driver Kumar.`;
+
+      document.getElementById('btnApproveException').classList.add('hidden');
+
+      setTimeout(() => {
+        document.getElementById('driverExceptionBanner').classList.add('hidden');
+        document.getElementById('btnApproveException').classList.remove('hidden');
+        currentPendingException = null;
+      }, 4000);
+    }
+
+    function dismissDriverException() {
+      document.getElementById('driverExceptionBanner').classList.add('hidden');
+      currentPendingException = null;
     }
 
     // ==========================================

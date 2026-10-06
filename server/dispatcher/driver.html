@@ -441,6 +441,25 @@
             fetchOrders();
           }
 
+          // EVENT: DISPATCHER ACKNOWLEDGED DRIVER EXCEPTION (Fuel/Break)
+          if (packet.type === 'EXCEPTION_ACK_RECEIVED') {
+            const data = packet.data || {};
+            const label = data.exceptionType === 'FUEL_REQUEST' ? 'Fuel Stop' : '15m Break';
+            playAlertChime();
+            showToast(`✅ Dispatch Approved: ${label} Authorized!`, "✅");
+
+            const btn = data.exceptionType === 'FUEL_REQUEST' ? document.getElementById('btnFuelAlert') : document.getElementById('btnBreakAlert');
+            if (btn) {
+              const origHtml = data.exceptionType === 'FUEL_REQUEST' ? '<span>⛽ Fuel Stop</span>' : '<span>☕ 15m Break</span>';
+              btn.innerHTML = `<span>✅ ${label} Approved</span>`;
+              btn.classList.add('border-emerald-500', 'text-emerald-300', 'bg-emerald-950/60');
+              setTimeout(() => {
+                btn.innerHTML = origHtml;
+                btn.classList.remove('border-emerald-500', 'text-emerald-300', 'bg-emerald-950/60');
+              }, 6000);
+            }
+          }
+
         } catch (e) {
           console.error("Packet parse error:", e);
         }
@@ -551,6 +570,11 @@
         ? "Emergency Fuel Stop Requested (Indian Oil, Adyar)"
         : "Driver requested 15-minute rest break";
 
+      const btn = type === 'FUEL_REQUEST' ? document.getElementById('btnFuelAlert') : document.getElementById('btnBreakAlert');
+      if (btn) {
+        btn.innerHTML = `<span class="animate-pulse">⏳ Transmitting...</span>`;
+      }
+
       ws.send(JSON.stringify({
         type: "DRIVER_EXCEPTION_ALERT",
         data: {
@@ -562,7 +586,7 @@
         }
       }));
 
-      showToast(`Alert sent to Dispatch: ${type === 'FUEL_REQUEST' ? 'Fuel Stop' : 'Break'}`, "⚠️");
+      showToast(`Alert sent: ${type === 'FUEL_REQUEST' ? 'Fuel Stop' : '15m Break'}. Waiting for Dispatch ACK...`, "📡");
     }
 
     // Fetch Initial Orders from Server

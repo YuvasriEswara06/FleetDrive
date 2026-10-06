@@ -323,6 +323,21 @@ export class FleetWebSocketManager {
       }
 
       // ----------------------------------------------------
+      // EVENT: ACK_DRIVER_EXCEPTION (Dispatcher approves Break/Fuel)
+      // ----------------------------------------------------
+      case "ACK_DRIVER_EXCEPTION": {
+        // Broadcast approval confirmation back to drivers
+        this.broadcastToDrivers({
+          type: "EXCEPTION_ACK_RECEIVED",
+          data: {
+            ...packet.data,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        break;
+      }
+
+      // ----------------------------------------------------
       // EVENT: PONG (Heartbeat response)
       // ----------------------------------------------------
       case "PONG": {
