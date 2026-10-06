@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "node:http";
 import { storage } from "./storage";
+import { verifyToken, type AuthenticatedUserPayload } from "./auth";
 
 export interface WebSocketPacket {
   type: string;
@@ -9,6 +10,7 @@ export interface WebSocketPacket {
   senderId?: string;
   packetId?: string;
   rttMs?: number;
+  token?: string;
 }
 
 interface ConnectedClient {
@@ -18,6 +20,8 @@ interface ConnectedClient {
   driverId?: string;
   ip: string;
   connectedAt: string;
+  authenticated: boolean;
+  user?: AuthenticatedUserPayload;
 }
 
 export class FleetWebSocketManager {
@@ -39,12 +43,27 @@ export class FleetWebSocketManager {
       const clientId = "client-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6);
       const ip = req.socket.remoteAddress || "127.0.0.1";
 
+      // Inspect URL query params for token (e.g. /ws?token=...)
+      let authenticatedUser: AuthenticatedUserPayload | null = null;
+      try {
+        const urlObj = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+        const tokenParam = urlObj.searchParams.get("token");
+        if (tokenParam) {
+          authenticatedUser = verifyToken(tokenParam);
+        }
+      } catch (e) {
+        // url parse fallback
+      }
+
       const clientInfo: ConnectedClient = {
         ws,
         id: clientId,
-        role: "dispatcher", // default until REGISTER packet
+        role: authenticatedUser?.role || "dispatcher",
+        driverId: authenticatedUser?.role === "driver" ? authenticatedUser.username : undefined,
         ip,
         connectedAt: new Date().toISOString(),
+        authenticated: !!authenticatedUser,
+        user: authenticatedUser || undefined,
       };
 
       this.clients.set(clientId, clientInfo);
@@ -55,19 +74,22 @@ export class FleetWebSocketManager {
         timestamp: new Date().toISOString(),
         direction: "INBOUND",
         eventType: "TCP_HANDSHAKE_101",
-        clientId,
+        clientId: clientInfo.driverId || clientId,
         payloadBytes: 128,
         latencyMs: 1.5,
-        status: "ACK_OK",
+        status: authenticatedUser ? "ACK_OK_JWT" : "ACK_OK",
       });
 
-      // Send Welcome / Handshake ACK
+      // Send Welcome / Handshake ACK with authentication status
       this.sendToClient(ws, {
         type: "HANDSHAKE_ACK",
         data: {
           clientId,
           serverTime: new Date().toISOString(),
           protocol: "RFC-6455-FLEETSYNC/1.0",
+          authenticated: clientInfo.authenticated,
+          authType: clientInfo.authenticated ? "HMAC-SHA256-JWT" : "DEV-OPEN",
+          user: clientInfo.user,
         },
       });
 
@@ -135,8 +157,24 @@ export class FleetWebSocketManager {
       // EVENT: REGISTER (Client declares role: driver/dispatcher)
       // ----------------------------------------------------
       case "REGISTER": {
-        client.role = packet.data?.role || (packet as any).role || "dispatcher";
-        client.driverId = packet.data?.driverId || (packet as any).driverId || (client.role === "driver" ? "driver1" : undefined);
+        const token = packet.data?.token || packet.token;
+        if (token && !client.authenticated) {
+          const verifiedUser = verifyToken(token);
+          if (verifiedUser) {
+            client.authenticated = true;
+            client.user = verifiedUser;
+            client.role = verifiedUser.role;
+            if (verifiedUser.role === "driver") {
+              client.driverId = verifiedUser.username;
+            }
+          }
+        }
+
+        if (!client.authenticated) {
+          // Permissive fallback for unauthenticated test sockets
+          client.role = packet.data?.role || (packet as any).role || "dispatcher";
+          client.driverId = packet.data?.driverId || (packet as any).driverId || (client.role === "driver" ? "driver1" : undefined);
+        }
 
         this.sendToClient(client.ws, {
           type: "REGISTER_ACK",
@@ -144,8 +182,24 @@ export class FleetWebSocketManager {
             role: client.role,
             driverId: client.driverId,
             status: "connected",
+            authenticated: client.authenticated,
+            authMechanism: client.authenticated ? "HMAC-SHA256-JWT" : "DEV-PERMISSIVE",
           },
         });
+
+        // Log security verification event for network auditor
+        if (client.authenticated) {
+          storage.logNetworkEvent({
+            id: "pkt-" + Date.now(),
+            timestamp: new Date().toISOString(),
+            direction: "INBOUND",
+            eventType: "SEC_JWT_AUTHENTICATED",
+            clientId: client.driverId || client.id,
+            payloadBytes: byteSize,
+            latencyMs: 1.1,
+            status: "AUTH_VERIFIED",
+          });
+        }
 
         // Broadcast driver online state to dispatchers
         if (client.role === "driver") {
