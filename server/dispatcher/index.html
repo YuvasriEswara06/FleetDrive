@@ -236,8 +236,8 @@
 
       <div id="map" class="w-full h-full min-h-[400px]"></div>
 
-      <!-- Floating Driver HUD (Kumar) -->
-      <div class="absolute bottom-4 left-4 z-[500] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-xl p-3 shadow-2xl flex items-center gap-3.5 text-xs max-w-sm">
+      <!-- Floating Driver HUD (Kumar - Only visible on active map, hidden on login gate) -->
+      <div id="floatingDriverHud" class="hidden absolute bottom-4 left-4 z-[500] bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-xl p-3 shadow-2xl flex items-center gap-3.5 text-xs max-w-sm">
         <div class="w-9 h-9 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 flex-shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
@@ -397,7 +397,7 @@
   <!-- ======================================================== -->
   <!-- 4. AUTHENTICATION MODAL (JWT Login Gate)                 -->
   <!-- ======================================================== -->
-  <div id="dispatcherAuthModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+  <div id="dispatcherAuthModal" class="hidden fixed inset-0 z-[9999] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
       <div class="text-center mb-5">
         <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
@@ -477,11 +477,14 @@
     function checkAuth() {
       const token = getJwtToken();
       const modal = document.getElementById('dispatcherAuthModal');
+      const driverHud = document.getElementById('floatingDriverHud');
       if (!token) {
         modal.classList.remove('hidden');
+        if (driverHud) driverHud.classList.add('hidden');
         return false;
       } else {
         modal.classList.add('hidden');
+        if (driverHud) driverHud.classList.remove('hidden');
         return true;
       }
     }
@@ -518,6 +521,8 @@
         sessionStorage.setItem('fleetdrive_token', data.token);
         sessionStorage.setItem('fleetdrive_user', JSON.stringify(data.user));
         document.getElementById('dispatcherAuthModal').classList.add('hidden');
+        const driverHud = document.getElementById('floatingDriverHud');
+        if (driverHud) driverHud.classList.remove('hidden');
 
         // Initialize App
         if (!map) initMap();
@@ -534,6 +539,8 @@
       sessionStorage.removeItem('fleetdrive_token');
       sessionStorage.removeItem('fleetdrive_user');
       document.getElementById('dispatcherAuthModal').classList.remove('hidden');
+      const driverHud = document.getElementById('floatingDriverHud');
+      if (driverHud) driverHud.classList.add('hidden');
     };
 
     // ==========================================
