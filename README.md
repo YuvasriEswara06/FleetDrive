@@ -205,4 +205,4 @@ https://drive.google.com/drive/folders/1AX9AmM9l8YoSfWFwdXc9gYm_2xWCLzYq?usp=sha
 
 ## License
 
-for academic and project purposes
+MIT License

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OpenStreetMap & OSRM Routing Client
  * 
  * Provides:
@@ -85,7 +85,7 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "FleetDrive-Academic-Project/1.0 (contact: support@fleetdrive.local)",
+        "User-Agent": "FleetDrive-App/1.0 (contact: support@fleetdrive.local)",
       },
       signal: controller.signal,
     });
