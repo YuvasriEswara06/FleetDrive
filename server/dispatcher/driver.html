@@ -526,18 +526,19 @@
 
     // Complete Current Delivery (PoD)
     async function completeCurrentDelivery() {
-      const activeOrder = allOrders[currentStopIndex];
+      // Find the currently active order (en_route or first non-completed)
+      const activeOrder = allOrders.find(o => o.status === 'en_route') || allOrders.find(o => o.status !== 'completed');
       if (!activeOrder) return;
 
       try {
-        // Send REST update
+        // Send REST update: mark activeOrder as completed
         await fetch(`/api/orders/${activeOrder.id}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'completed' })
         });
 
-        // Send WebSocket update
+        // Send WebSocket update for completed order
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: "ORDER_STATUS_UPDATE",
@@ -549,9 +550,31 @@
           }));
         }
 
-        showToast(`Delivered: ${activeOrder.customerName}`, "✅");
         activeOrder.status = "completed";
-        currentStopIndex++;
+        showToast(`Delivered: ${activeOrder.customerName}`, "✅");
+
+        // Advance NEXT non-completed stop to 'en_route'
+        const nextOrder = allOrders.find(o => o.status !== 'completed');
+        if (nextOrder) {
+          nextOrder.status = "en_route";
+          await fetch(`/api/orders/${nextOrder.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'en_route' })
+          });
+
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: "ORDER_STATUS_UPDATE",
+              data: {
+                orderId: nextOrder.id,
+                status: "en_route",
+                driverId: "driver1"
+              }
+            }));
+          }
+        }
+
         renderStops();
 
       } catch (err) {
@@ -606,27 +629,49 @@
 
     // Render Stops in Phone UI
     function renderStops() {
-      const active = allOrders.find(o => o.status === 'en_route') || allOrders[currentStopIndex] || allOrders[0];
+      const active = allOrders.find(o => o.status === 'en_route') || allOrders.find(o => o.status !== 'completed');
       const upcoming = allOrders.filter(o => o.id !== active?.id && o.status !== 'completed');
       const completedCount = allOrders.filter(o => o.status === 'completed').length;
 
       document.getElementById('routeProgressText').textContent = `${completedCount} / ${allOrders.length} Delivered`;
       document.getElementById('upcomingCount').textContent = `${upcoming.length} Stops Left`;
 
+      const btnPoD = document.getElementById('btnMarkDelivered');
+
       if (active) {
+        const activeIdx = allOrders.findIndex(o => o.id === active.id);
         document.getElementById('currentCustomerName').textContent = active.customerName;
         document.getElementById('currentAddress').textContent = active.address;
         document.getElementById('currentTimeWindow').textContent = active.timeWindow || "Scheduled";
         document.getElementById('currentPkgId').textContent = `${active.packageId || active.id} (${active.weight || "2 kg"})`;
-        document.getElementById('currentStopBadge').textContent = `STOP #${currentStopIndex + 1}`;
+        document.getElementById('currentStopBadge').textContent = `STOP #${activeIdx + 1}`;
+        if (btnPoD) {
+          btnPoD.disabled = false;
+          btnPoD.className = 'w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition cursor-pointer';
+          btnPoD.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>Confirm Delivery & Upload PoD</span>`;
+        }
+      } else {
+        // All orders completed!
+        document.getElementById('currentCustomerName').textContent = "All Deliveries Completed 🎉";
+        document.getElementById('currentAddress').textContent = "Shift finished. All scheduled packages successfully delivered.";
+        document.getElementById('currentTimeWindow').textContent = "Completed";
+        document.getElementById('currentPkgId').textContent = "Shift Done";
+        document.getElementById('currentStopBadge').textContent = `COMPLETED`;
+        if (btnPoD) {
+          btnPoD.disabled = true;
+          btnPoD.className = 'w-full py-2.5 px-4 rounded-xl bg-slate-800 text-slate-400 font-semibold text-xs flex items-center justify-center gap-2 cursor-not-allowed';
+          btnPoD.innerHTML = `<span>✅ All Deliveries Completed</span>`;
+        }
       }
 
       const container = document.getElementById('stopsListContainer');
-      container.innerHTML = upcoming.map((stop, idx) => `
+      container.innerHTML = upcoming.map((stop) => {
+        const stopIdx = allOrders.findIndex(o => o.id === stop.id);
+        return `
         <div class="p-3 rounded-xl glass-card border ${stop.isUrgent ? 'border-red-500/50 bg-red-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
           <div class="flex items-center gap-2.5">
             <span class="w-5 h-5 rounded-full ${stop.isUrgent ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-slate-800 text-slate-400'} flex items-center justify-center font-mono font-bold text-[10px]">
-              ${idx + 2}
+              ${stopIdx + 1}
             </span>
             <div>
               <div class="font-semibold text-slate-200 flex items-center gap-1.5">
@@ -638,7 +683,8 @@
           </div>
           <span class="text-[10px] font-mono text-slate-400">${stop.timeWindow || "Scheduled"}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     // Periodic GPS Telemetry Ping (4 seconds)
